@@ -28,6 +28,7 @@ impl ChatServer {
         for (addr, messages) in self.message_queue.iter_mut() {
             messages.sort_by(|a, b| a.id.cmp(&b.id));
             while let Some(message) = messages.pop() {
+                Self::aknowledge_message(&self.socket, &message, addr).await?;
                 Self::process_message(message, addr).await;
             }
         }

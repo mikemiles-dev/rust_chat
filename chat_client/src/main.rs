@@ -89,51 +89,66 @@ impl ChatClient {
         self.send_message(MessageTypes::Join, &message).await
     }
 
-    async fn run(&mut self) -> io::Result<()> {
-        // 2. Setup the Asynchronous User Input
+    async fn get_user_input() -> Option<String> {
         let stdin = tokio::io::stdin();
         let mut reader = tokio::io::BufReader::new(stdin);
         let mut input_line = String::new();
 
-        loop {
-            let mut udp_buf = [0; 1024];
+        match reader.read_line(&mut input_line).await {
+            Ok(0) => {
+                // EOF (e.g., Ctrl+D or stream closed)
+                println!("**[Input]** EOF received. Exiting...");
+            }
+            Ok(_) => {
+                let trimmed_input = input_line.trim();
+                println!("**[Input]** You typed: {}", trimmed_input);
 
+                if trimmed_input.eq_ignore_ascii_case("quit") {
+                    println!("**[Input]** Quitting application.");
+                    return None;
+                }
+                // IMPORTANT: Clear the buffer for the next read
+                input_line.clear();
+            }
+            Err(e) => {
+                eprintln!("Input error: {}", e);
+            }
+        }
+        Some(input_line)
+    }
+
+    async fn listen_for_messages(&mut self) -> io::Result<()> {
+        let mut buf = [0; 1024];
+        loop {
+            let (len, addr) = self.socket.recv_from(&mut buf).await?;
+            let msg = String::from_utf8_lossy(&buf[..len]);
+            println!("**[UDP]** Received {} bytes from {}: {}", len, addr, msg);
+        }
+    }
+
+    async fn run(&mut self) -> io::Result<()> {
+        loop {
             // 3. Use tokio::select! to concurrently wait for either operation
             tokio::select! {
                 // Branch 1: UDP Socket Receive
-                result = self.socket.recv_from(&mut udp_buf) => {
-                    match result {
-                        Ok((len, addr)) => {
-                            let msg = String::from_utf8_lossy(&udp_buf[..len]);
-                            println!("**[UDP]** Received {} bytes from {}: {}", len, addr, msg);
-                        }
-                        Err(e) => {
-                            eprintln!("UDP receive error: {}", e);
-                        }
+                result = self.listen_for_messages() => {
+                    if let Err(e) = result {
+                        eprintln!("Error receiving UDP message: {:?}", e);
                     }
                 }
 
                 // Branch 2: User Input
-                result = reader.read_line(&mut input_line) => {
-                    match result {
-                        Ok(0) => {
-                            // EOF (e.g., Ctrl+D or stream closed)
-                            println!("**[Input]** EOF received. Exiting...");
-                        }
-                        Ok(_) => {
-                            let trimmed_input = input_line.trim();
-                            println!("**[Input]** You typed: {}", trimmed_input);
-
-                            if trimmed_input.eq_ignore_ascii_case("quit") {
-                                println!("**[Input]** Quitting application.");
-                                return Ok(());
+                result = ChatClient::get_user_input() => {
+                    if let Some(input_line) = result {
+                        let trimmed_input = input_line.trim();
+                        if !trimmed_input.is_empty() {
+                            if let Err(e) = self.send_message(MessageTypes::ChatMessage, trimmed_input).await {
+                                eprintln!("Error sending message: {:?}", e);
                             }
-                            // IMPORTANT: Clear the buffer for the next read
-                            input_line.clear();
                         }
-                        Err(e) => {
-                            eprintln!("Input error: {}", e);
-                        }
+                    } else {
+                        // User chose to quit
+                        return Ok(());
                     }
                 }
             }
