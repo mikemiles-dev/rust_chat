@@ -1,5 +1,7 @@
+#[derive(Debug, Clone, Copy)]
 pub enum MessageError {
     InvalidFormat,
+    InvalidLength,
     UnknownType,
 }
 
@@ -42,17 +44,41 @@ impl<'a> Message<'a> {
     }
 }
 
-// Protocol is: [1 byte id][1 byte type][content bytes]
-impl<'a> From<Message<'a>> for Vec<u8> {
-    fn from(message: Message) -> Self {
-        let mut buffer = Vec::with_capacity(1 + 1 + message.length);
+/// Protocol is: [1 byte id][1 byte type][2 byte content len][content bytes]
+impl<'a> TryFrom<Message<'a>> for Vec<u8> {
+    type Error = MessageError;
+
+    fn try_from(message: Message) -> Result<Self, Self::Error> {
+        let mut buffer = Vec::with_capacity(1 + 1 + 2 + message.length);
+        let message_length =
+            u16::try_from(message.length).map_err(|_| MessageError::InvalidLength)?;
         buffer.push(message.id);
         buffer.push(match message.msg_type {
             MessageTypes::ChatMessage => 0,
             MessageTypes::Join => 1,
             MessageTypes::Leave => 2,
         });
+        buffer.extend_from_slice(&message_length.to_be_bytes());
         buffer.extend_from_slice(message.content);
-        buffer
+        Ok(buffer)
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for Message<'a> {
+    type Error = MessageError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        if value.len() < 2 {
+            return Err(MessageError::InvalidFormat);
+        }
+        let id = value[0];
+        let msg_type = MessageTypes::try_from(value[1])?;
+        let content = &value[2..];
+        Ok(Message {
+            id,
+            msg_type,
+            length: content.len(),
+            content,
+        })
     }
 }

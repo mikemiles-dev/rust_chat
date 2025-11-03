@@ -32,6 +32,7 @@ dependencies = [
 name = "chat_server"
 version = "0.1.0"
 dependencies = [
+ "chat_shared",
  "tokio",
 ]
 

@@ -1,7 +1,8 @@
 use std::io::{self, Write};
+use tokio::io::AsyncBufReadExt;
 use tokio::net::UdpSocket;
 
-use chat_shared::{Message, MessageTypes};
+use chat_shared::{Message, MessageError, MessageTypes};
 
 struct ChatClient {
     socket: UdpSocket,
@@ -20,6 +21,7 @@ pub struct SentMessage {
 pub enum ChatClientError {
     IoError(io::Error),
     JoinError(String),
+    MessageError(MessageError),
 }
 
 impl ChatClient {
@@ -46,7 +48,10 @@ impl ChatClient {
         self.increment_message_id().await;
         let content_owned = content.to_string().into_bytes();
         let message = Message::new(message_type, &content_owned, self.message_id_counter);
-        let message_bytes: Vec<u8> = message.clone().into();
+        let message_bytes: Vec<u8> = message
+            .clone()
+            .try_into()
+            .map_err(|e| ChatClientError::MessageError(e))?;
         let sent_length = self
             .socket
             .send_to(&message_bytes, &self.server_addr)
@@ -80,26 +85,70 @@ impl ChatClient {
         let message = format!("{}", self.name);
         self.send_message(MessageTypes::Join, &message).await
     }
+
+    async fn run(&mut self) -> io::Result<()> {
+        let mut udp_buf = [0; 1024];
+
+        // 2. Setup the Asynchronous User Input
+        let stdin = tokio::io::stdin();
+        let mut reader = tokio::io::BufReader::new(stdin);
+        let mut input_line = String::new();
+
+        loop {
+            // 3. Use tokio::select! to concurrently wait for either operation
+            tokio::select! {
+                // Branch 1: UDP Socket Receive
+                result = self.socket.recv_from(&mut udp_buf) => {
+                    match result {
+                        Ok((len, addr)) => {
+                            let msg = String::from_utf8_lossy(&udp_buf[..len]);
+                            println!("**[UDP]** Received {} bytes from {}: {}", len, addr, msg);
+                        }
+                        Err(e) => {
+                            eprintln!("UDP receive error: {}", e);
+                        }
+                    }
+                }
+
+                // Branch 2: User Input
+                result = reader.read_line(&mut input_line) => {
+                    match result {
+                        Ok(0) => {
+                            // EOF (e.g., Ctrl+D or stream closed)
+                            println!("**[Input]** EOF received. Exiting...");
+                        }
+                        Ok(_) => {
+                            let trimmed_input = input_line.trim();
+                            println!("**[Input]** You typed: {}", trimmed_input);
+
+                            if trimmed_input.eq_ignore_ascii_case("quit") {
+                                println!("**[Input]** Quitting application.");
+                                return Ok(());
+                            }
+                            // IMPORTANT: Clear the buffer for the next read
+                            input_line.clear();
+                        }
+                        Err(e) => {
+                            eprintln!("Input error: {}", e);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let (chat_server, chat_name) = prompt_server_info()?;
     let mut client = ChatClient::new(&chat_server, chat_name).await?;
-    let mut user_input = String::new();
 
     client
         .join_server()
         .await
         .expect(format!("Could not connect to: {}", chat_server).as_str());
 
-    loop {
-        user_input.clear();
-        println!("Press Enter to send a message...");
-        io::stdin().read_line(&mut user_input)?;
-    }
-
-    Ok(())
+    client.run().await
 }
 
 fn prompt_server_info() -> io::Result<(String, String)> {

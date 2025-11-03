@@ -7,4 +7,5 @@ authors.workspace = true
 readme.workspace = true
 
 [dependencies]
+chat_shared.workspace = true
 tokio.workspace = true
