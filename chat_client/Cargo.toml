@@ -1,0 +1,11 @@
+[package]
+name = "chat_client"
+description.workspace = true
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+readme.workspace = true
+
+[dependencies]
+tokio.workspace = true
+chat_shared.workspace = true

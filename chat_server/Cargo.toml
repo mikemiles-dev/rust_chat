@@ -1,0 +1,10 @@
+[package]
+name = "chat_server"
+description.workspace = true
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+readme.workspace = true
+
+[dependencies]
+tokio.workspace = true

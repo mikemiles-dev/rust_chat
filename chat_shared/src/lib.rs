@@ -1,0 +1,58 @@
+pub enum MessageError {
+    InvalidFormat,
+    UnknownType,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum MessageTypes {
+    ChatMessage,
+    Join,
+    Leave,
+}
+
+impl TryFrom<u8> for MessageTypes {
+    type Error = MessageError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(MessageTypes::ChatMessage),
+            1 => Ok(MessageTypes::Join),
+            2 => Ok(MessageTypes::Leave),
+            _ => Err(MessageError::UnknownType),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Message<'a> {
+    pub id: u8,
+    pub msg_type: MessageTypes,
+    pub length: usize,
+    pub content: &'a [u8],
+}
+
+impl<'a> Message<'a> {
+    pub fn new(msg_type: MessageTypes, content: &'a [u8], id: u8) -> Self {
+        Message {
+            id,
+            msg_type,
+            length: content.len(),
+            content,
+        }
+    }
+}
+
+// Protocol is: [1 byte id][1 byte type][content bytes]
+impl<'a> From<Message<'a>> for Vec<u8> {
+    fn from(message: Message) -> Self {
+        let mut buffer = Vec::with_capacity(1 + 1 + message.length);
+        buffer.push(message.id);
+        buffer.push(match message.msg_type {
+            MessageTypes::ChatMessage => 0,
+            MessageTypes::Join => 1,
+            MessageTypes::Leave => 2,
+        });
+        buffer.extend_from_slice(message.content);
+        buffer
+    }
+}
