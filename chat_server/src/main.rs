@@ -68,6 +68,33 @@ impl ChatServer {
         Ok(())
     }
 
+    async fn verify_message(
+        received_len: usize,
+        message_len: usize,
+        src_addr: &SocketAddr,
+    ) -> bool {
+        let message_len = match message_len.checked_add(4) {
+            Some(len) => len,
+            None => {
+                eprintln!(
+                    "Warning: Message length overflow for message from {}",
+                    src_addr
+                );
+                return false;
+            }
+        };
+        if received_len != message_len + 4 {
+            eprintln!(
+                "Warning: Received length {} does not match expected message length {} from {}",
+                received_len,
+                message_len + 4,
+                src_addr
+            );
+            return false;
+        }
+        true
+    }
+
     async fn run(&mut self) -> io::Result<()> {
         let mut buf = [0; 1024]; // Buffer to hold incoming data
         let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(5));
@@ -84,6 +111,8 @@ impl ChatServer {
                             continue;
                         }
                     };
+
+                    Self::verify_message(len, message.length, &addr).await;
 
                     self.handle_message(message, addr).await;
 
