@@ -54,6 +54,16 @@ impl ChatServer {
                 let content = message.get_content().unwrap_or_default();
                 println!("**[Message]** {}", content);
             }
+            chat_shared::MessageTypes::AskStatus => {
+                println!("**[Status Request]** from {}", src_addr);
+            }
+            chat_shared::MessageTypes::Acknowledge => {
+                println!("**[Acknowledge]** from {}", src_addr);
+            }
+            chat_shared::MessageTypes::UserRename => {
+                let content = message.get_content().unwrap_or_default();
+                println!("**[Rename]** User renamed to {}.", content);
+            }
             _ => (),
         }
     }
