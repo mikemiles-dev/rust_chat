@@ -45,7 +45,17 @@ impl NewConnection {
         loop {
             tokio::select! {
                 result = self.read_message_chunked() => {
-                    let message = result?;
+                    let message = match result {
+                        Ok(msg) => msg,
+                        Err(chat_shared::network::TcpMessageHandlerError::IoError(e)) => {
+                            eprintln!("IO error reading from {}: {:?}", self.addr, e);
+                            break;
+                        }
+                        Err(chat_shared::network::TcpMessageHandlerError::Disconnect) => {
+                            println!("Client {} disconnected.", self.addr);
+                            break;
+                        }
+                    };
                     println!("Received {:?} from: {}", message, self.addr);
                     // Client disconnected or closed the connection
                 }

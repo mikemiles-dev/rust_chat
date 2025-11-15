@@ -80,8 +80,18 @@ impl ChatClient {
             tokio::select! {
                 // Branch 1: Receive
                 result = self.read_message_chunked() => {
-                    if let Err(e) = result {
-                        eprintln!("Error receiving message: {:?}", e);
+                    match result {
+                        Ok(message) => {
+                            println!("Received message: {:?}", message);
+                        }
+                        Err(chat_shared::network::TcpMessageHandlerError::IoError(e)) => {
+                            eprintln!("IO error reading from server: {:?}", e);
+                            return Err(e);
+                        }
+                        Err(chat_shared::network::TcpMessageHandlerError::Disconnect) => {
+                            println!("Disconnected from server.");
+                            return Ok(());
+                        }
                     }
                 }
                 // Branch 2: User Input

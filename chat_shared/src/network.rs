@@ -4,6 +4,11 @@ use tokio::io::AsyncWriteExt;
 
 pub const CHUNK_SIZE: usize = 8192;
 
+pub enum TcpMessageHandlerError {
+    IoError(std::io::Error),
+    Disconnect,
+}
+
 #[allow(async_fn_in_trait)]
 pub trait TcpMessageHandler {
     fn get_stream(&mut self) -> &mut tokio::net::TcpStream;
@@ -41,10 +46,19 @@ pub trait TcpMessageHandler {
         Ok(())
     }
 
-    async fn read_message_chunked(&mut self) -> Result<ChatMessage, std::io::Error> {
+    async fn read_message_chunked(&mut self) -> Result<ChatMessage, TcpMessageHandlerError> {
         // Read the first 2 bytes to get the message length
         let mut len_bytes = [0u8; 2];
-        self.get_stream().read_exact(&mut len_bytes).await?;
+        self.get_stream()
+            .read_exact(&mut len_bytes)
+            .await
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    TcpMessageHandlerError::Disconnect
+                } else {
+                    TcpMessageHandlerError::IoError(e)
+                }
+            })?;
 
         let msg_len = u16::from_be_bytes(len_bytes) as usize;
 
@@ -54,13 +68,14 @@ pub trait TcpMessageHandler {
 
         while bytes_read < msg_len {
             let mut chunk = vec![0u8; std::cmp::min(CHUNK_SIZE, msg_len - bytes_read)];
-            let n = self.get_stream().read(&mut chunk).await?;
+            let n = self
+                .get_stream()
+                .read(&mut chunk)
+                .await
+                .map_err(TcpMessageHandlerError::IoError)?;
 
             if n == 0 {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::UnexpectedEof,
-                    "Connection closed while reading message",
-                ));
+                return Err(TcpMessageHandlerError::Disconnect);
             }
 
             message_bytes.extend_from_slice(&chunk[..n]);
@@ -68,9 +83,20 @@ pub trait TcpMessageHandler {
         }
 
         // Send OK response to acknowledge receipt
-        self.get_stream().write_all(b"OK").await?;
-        self.get_stream().flush().await?;
-
+        self.get_stream().write_all(b"OK").await.map_err(|e| {
+            if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                TcpMessageHandlerError::Disconnect
+            } else {
+                TcpMessageHandlerError::IoError(e)
+            }
+        })?;
+        self.get_stream().flush().await.map_err(|e| {
+            if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                TcpMessageHandlerError::Disconnect
+            } else {
+                TcpMessageHandlerError::IoError(e)
+            }
+        })?;
         let message = ChatMessage::from(message_bytes);
 
         Ok(message)
