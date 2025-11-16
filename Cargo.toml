@@ -12,3 +12,4 @@ readme = "README.md"
 [workspace.dependencies]
 chat_shared = { path = "chat_shared" }
 tokio = { version = "1", features = ["full"] }
+rand = "0.8"

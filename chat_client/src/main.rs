@@ -1,7 +1,7 @@
 use chat_shared::network::TcpMessageHandler;
 use std::io::{self, Write};
 use std::net::{AddrParseError, SocketAddr};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+use tokio::io::AsyncBufReadExt;
 
 use chat_shared::message::{ChatMessage, ChatMessageError, MessageTypes};
 use tokio::net::TcpStream;
@@ -74,6 +74,36 @@ impl ChatClient {
         Some(input_line)
     }
 
+    async fn handle_message(&mut self, message: ChatMessage) {
+        match message.msg_type {
+            MessageTypes::Join => {
+                if let Some(content) = message.content_as_string() {
+                    println!(">>> {} has joined the chat.", content);
+                } else {
+                    eprintln!("Received invalid UTF-8 join message.");
+                }
+            }
+            MessageTypes::Leave => {
+                if let Some(content) = message.content_as_string() {
+                    println!(">>> {} has left the chat.", content);
+                } else {
+                    eprintln!("Received invalid UTF-8 leave message.");
+                }
+            }
+            MessageTypes::UserRename => {
+                if let Some(content) = message.content_as_string() {
+                    println!(">>> You have been renamed to '{}'.", content);
+                    self.chat_name = content;
+                } else {
+                    eprintln!("Received invalid UTF-8 rename message.");
+                }
+            }
+            _ => {
+                eprintln!("Received unknown message type: {:?}", message.msg_type);
+            }
+        }
+    }
+
     async fn run(&mut self) -> io::Result<()> {
         loop {
             // 3. Use tokio::select! to concurrently wait for either operation
@@ -81,9 +111,7 @@ impl ChatClient {
                 // Branch 1: Receive
                 result = self.read_message_chunked() => {
                     match result {
-                        Ok(message) => {
-                            println!("Received message: {:?}", message);
-                        }
+                        Ok(message) => self.handle_message(message).await,
                         Err(chat_shared::network::TcpMessageHandlerError::IoError(e)) => {
                             eprintln!("IO error reading from server: {:?}", e);
                             return Err(e);

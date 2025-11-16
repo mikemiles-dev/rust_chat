@@ -22,8 +22,20 @@ impl From<u8> for MessageTypes {
 #[derive(Debug, Clone)]
 pub struct ChatMessage {
     msg_len: u16,
-    msg_type: MessageTypes,
+    pub msg_type: MessageTypes,
     content: Option<Vec<u8>>,
+}
+
+impl ChatMessage {
+    pub fn get_content(&self) -> Option<&[u8]> {
+        self.content.as_deref()
+    }
+
+    pub fn content_as_string(&self) -> Option<String> {
+        self.content
+            .as_ref()
+            .and_then(|data| String::from_utf8(data.clone()).ok())
+    }
 }
 
 #[derive(Debug)]
