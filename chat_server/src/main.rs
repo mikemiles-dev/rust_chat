@@ -5,7 +5,7 @@ use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::sync::broadcast;
 
-use chat_shared::message::ChatMessage;
+use chat_shared::message::{ChatMessage, MessageTypes};
 
 pub struct ConnectedClient {
     pub addr: String,
@@ -21,7 +21,6 @@ pub struct NewConnection {
     socket: TcpStream,
     addr: SocketAddr,
     tx: broadcast::Sender<(ChatMessage, SocketAddr)>,
-    rx: broadcast::Receiver<(ChatMessage, SocketAddr)>,
 }
 
 impl TcpMessageHandler for NewConnection {
@@ -34,14 +33,21 @@ impl NewConnection {
     async fn handle(&mut self) -> Result<(), io::Error> {
         println!("New client connected: {}", self.addr);
 
-        // Initial broadcast to all existing clients
-        // let welcome_msg = format!(">>> {} has joined the chat.", addr);
-        // let chat_msg = ChatMessage::try_new(MessageTypes::Join, Some(welcome_msg));
-        // tx.send((chat_msg, addr)).ok();
+        let mut rx = self.tx.subscribe();
 
-        // Loop continuously, concurrently waiting for either:
-        // 1) A message from this client's socket (socket_read)
-        // 2) A message broadcast from another client (channel_recv)
+        // Initial broadcast to all existing clients
+        let welcome_msg = format!(">>> {} has joined the chat.", self.addr)
+            .as_bytes()
+            .to_vec();
+        let chat_msg =
+            ChatMessage::try_new(MessageTypes::Join, Some(welcome_msg)).map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Failed to create join message: {:?}", e),
+                )
+            })?;
+        self.tx.send((chat_msg, self.addr)).ok();
+
         loop {
             tokio::select! {
                 result = self.read_message_chunked() => {
@@ -59,22 +65,20 @@ impl NewConnection {
                     println!("Received {:?} from: {}", message, self.addr);
                     // Client disconnected or closed the connection
                 }
-                // result = rx.recv() => {
-                //     // If a message is received from the channel...
-                //     let msg = match result {
-                //         Ok(m) => m,
-                //         // Handle lagging: If the receiver falls too far behind, skip the message.
-                //         Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                //         // If the sender has been dropped, this task can exit (shouldn't happen here).
-                //         Err(broadcast::error::RecvError::Closed) => {
-                //             eprintln!("Broadcast channel closed.");
-                //             break;
-                //         },
-                //     };
-
-                //     // Write the received message to this client's socket
-                //     writer.write_all(b"\n").await?;
-                // }
+                result = rx.recv() => {
+                    match result {
+                        Ok((msg, src_addr)) => {
+                            // Avoid sending the message back to the sender
+                            if src_addr != self.addr {
+                                self.send_message_chunked(msg).await?;
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Broadcast receive error for {}: {:?}", self.addr, e);
+                            break;
+                        }
+                    }
+                }
             }
         }
 
@@ -120,15 +124,13 @@ impl ChatServer {
 
     async fn run(&mut self) -> io::Result<()> {
         loop {
-            let (mut socket, addr) = self.listener.accept().await?;
+            let (socket, addr) = self.listener.accept().await?;
             let tx_clone = self.broadcaster.clone();
-            let mut rx = self.broadcaster.subscribe(); // Get a receiver for this client
 
             let mut client_connection = NewConnection {
                 socket,
                 addr,
                 tx: tx_clone,
-                rx,
             };
 
             // Spawn a task to handle the client
