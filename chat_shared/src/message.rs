@@ -60,7 +60,7 @@ impl ChatMessage {
                 .len()
                 .checked_add(3)
                 .ok_or(ChatMessageError::InvalidLength)?,
-            None => 1, // only msg_type byte
+            None => 3, // only msg_type byte + len
         };
         Ok(ChatMessage {
             msg_len: u16::try_from(msg_len).map_err(|_| ChatMessageError::InvalidLength)?,
@@ -75,7 +75,7 @@ impl From<Vec<u8>> for ChatMessage {
     fn from(buffer: Vec<u8>) -> Self {
         if buffer.is_empty() {
             return ChatMessage {
-                msg_len: 0,
+                msg_len: 3,
                 msg_type: MessageTypes::Unknown(0),
                 content: None,
             };
