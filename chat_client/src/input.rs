@@ -9,19 +9,22 @@ pub enum UserInput {
 
 #[derive(Debug)]
 pub enum UserInputError {
-    InvalidCommand,
-    IoError(io::Error),
+    IoError,
 }
 
-impl TryFrom<&str> for UserInput {
-    type Error = UserInputError;
+impl From<io::Error> for UserInputError {
+    fn from(_: io::Error) -> Self {
+        UserInputError::IoError
+    }
+}
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+impl From<&str> for UserInput {
+    fn from(value: &str) -> Self {
         let trimmed = value.trim();
         match trimmed.split_whitespace().next().unwrap_or("") {
-            "/quit" => Ok(UserInput::Quit),
-            "/help" => Ok(UserInput::Help),
-            _ => Ok(UserInput::Message(trimmed.to_string())),
+            "/quit" => UserInput::Quit,
+            "/help" => UserInput::Help,
+            _ => UserInput::Message(trimmed.to_string()),
         }
     }
 }
@@ -34,7 +37,7 @@ where
 
     match reader.read_line(&mut input_line).await {
         Ok(0) => Ok(UserInput::Quit),
-        Ok(_) => UserInput::try_from(input_line.as_str()),
-        Err(e) => Err(UserInputError::IoError(e)),
+        Ok(_) => Ok(UserInput::from(input_line.as_str())),
+        Err(e) => Err(e.into()),
     }
 }

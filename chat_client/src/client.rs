@@ -9,11 +9,27 @@ use tokio::net::TcpStream;
 
 #[derive(Debug)]
 pub enum ChatClientError {
-    InvalidAddress(AddrParseError),
-    IoError(io::Error),
-    JoinError(String),
-    TokioError(tokio::io::Error),
-    ChatMessageError(ChatMessageError),
+    InvalidAddress,
+    IoError,
+    ChatMessageError,
+}
+
+impl From<AddrParseError> for ChatClientError {
+    fn from(_: AddrParseError) -> Self {
+        ChatClientError::InvalidAddress
+    }
+}
+
+impl From<io::Error> for ChatClientError {
+    fn from(_: io::Error) -> Self {
+        ChatClientError::IoError
+    }
+}
+
+impl From<ChatMessageError> for ChatClientError {
+    fn from(_: ChatMessageError) -> Self {
+        ChatClientError::ChatMessageError
+    }
 }
 
 pub struct ChatClient {
@@ -23,13 +39,8 @@ pub struct ChatClient {
 
 impl ChatClient {
     pub async fn new(server_addr: &str, name: String) -> Result<Self, ChatClientError> {
-        let server_addr: SocketAddr = server_addr
-            .parse()
-            .map_err(ChatClientError::InvalidAddress)?;
-
-        let stream = TcpStream::connect(server_addr)
-            .await
-            .map_err(ChatClientError::IoError)?;
+        let server_addr: SocketAddr = server_addr.parse()?;
+        let stream = TcpStream::connect(server_addr).await?;
 
         Ok(ChatClient {
             connection: stream,
@@ -39,11 +50,8 @@ impl ChatClient {
 
     pub async fn join_server(&mut self) -> Result<(), ChatClientError> {
         let chat_message =
-            ChatMessage::try_new(MessageTypes::Join, Some(self.chat_name.as_bytes().to_vec()))
-                .map_err(ChatClientError::ChatMessageError)?;
-        self.send_message_chunked(chat_message)
-            .await
-            .map_err(ChatClientError::TokioError)?;
+            ChatMessage::try_new(MessageTypes::Join, Some(self.chat_name.as_bytes().to_vec()))?;
+        self.send_message_chunked(chat_message).await?;
         Ok(())
     }
 
@@ -76,7 +84,7 @@ impl ChatClient {
                 if let Some(content) = self.get_message_content(&message, "chat") {
                     let should_display = content
                         .split_once(": ")
-                        .map_or(true, |(username, _)| username != self.chat_name);
+                        .is_none_or(|(username, _)| username != self.chat_name);
 
                     if should_display {
                         logger::log_chat(&content);
@@ -92,11 +100,9 @@ impl ChatClient {
     async fn handle_user_input(&mut self, user_input: input::UserInput) -> Result<(), ChatClientError> {
         match user_input {
             input::UserInput::Message(msg) => {
-                let message = ChatMessage::try_new(MessageTypes::ChatMessage, Some(msg.into_bytes()))
-                    .map_err(ChatClientError::ChatMessageError)?;
-                self.send_message_chunked(message)
-                    .await
-                    .map_err(ChatClientError::TokioError)
+                let message = ChatMessage::try_new(MessageTypes::ChatMessage, Some(msg.into_bytes()))?;
+                self.send_message_chunked(message).await?;
+                Ok(())
             }
             input::UserInput::Help => {
                 logger::log_info("Available commands:");

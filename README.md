@@ -6,3 +6,7 @@
 ## Client:
 `cargo run --bin chat_client`
 
+## Help:
+`/help`
+
+![Usage](usage.png)

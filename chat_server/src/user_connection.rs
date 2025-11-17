@@ -144,6 +144,7 @@ impl UserConnection {
         let chat_content = content.unwrap();
         if let Some(chat_name) = &self.chat_name {
             let full_message = format!("{}: {}", chat_name, chat_content);
+            logger::log_chat(&full_message);
             let broadcast_message =
                 ChatMessage::try_new(MessageTypes::ChatMessage, Some(full_message.into_bytes()))
                     .map_err(|_| UserConnectionError::InvalidMessage)?;
@@ -152,7 +153,10 @@ impl UserConnection {
                 .map_err(UserConnectionError::BroadcastError)?;
             Ok(())
         } else {
-            logger::log_warning(&format!("User at {} sent chat message before joining", self.addr));
+            logger::log_warning(&format!(
+                "User at {} sent chat message before joining",
+                self.addr
+            ));
             Err(UserConnectionError::InvalidMessage)
         }
     }
@@ -171,7 +175,10 @@ impl UserConnection {
                 logger::log_warning(&format!("User '{}' already exists, renaming...", content));
                 let new_name = self.randomize_username(&content);
                 if !clients.insert(new_name.clone()) {
-                    logger::log_error(&format!("Failed to assign random username to '{}'", content));
+                    logger::log_error(&format!(
+                        "Failed to assign random username to '{}'",
+                        content
+                    ));
                     return Err(UserConnectionError::JoinError);
                 }
                 logger::log_success(&format!("User '{}' renamed to '{}'", content, new_name));

@@ -13,10 +13,10 @@ async fn main() -> io::Result<()> {
     let (chat_server, chat_name) = prompt_server_info()?;
 
     let mut client = ChatClient::new(&chat_server, chat_name).await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to create client: {e:?}")))?;
+        .map_err(|e| io::Error::other(format!("Failed to create client: {e:?}")))?;
 
     client.join_server().await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to join server: {e:?}")))?;
+        .map_err(|e| io::Error::other(format!("Failed to join server: {e:?}")))?;
 
     client.run().await
 }
