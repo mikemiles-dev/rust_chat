@@ -5,7 +5,9 @@ use chat_shared::network::TcpMessageHandler;
 use colored::Colorize;
 use std::io::{self, Write};
 use std::net::{AddrParseError, SocketAddr};
+use std::time::Duration;
 use tokio::net::TcpStream;
+use tokio::time::sleep;
 
 #[derive(Debug)]
 pub enum ChatClientError {
@@ -34,6 +36,7 @@ impl From<ChatMessageError> for ChatClientError {
 
 pub struct ChatClient {
     connection: TcpStream,
+    server_addr: SocketAddr,
     chat_name: String,
     last_dm_sender: Option<String>,
 }
@@ -45,6 +48,7 @@ impl ChatClient {
 
         Ok(ChatClient {
             connection: stream,
+            server_addr,
             chat_name: name,
             last_dm_sender: None,
         })
@@ -55,6 +59,51 @@ impl ChatClient {
             ChatMessage::try_new(MessageTypes::Join, Some(self.chat_name.as_bytes().to_vec()))?;
         self.send_message_chunked(chat_message).await?;
         Ok(())
+    }
+
+    async fn reconnect(&mut self) -> Result<(), ChatClientError> {
+        const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
+        const MAX_BACKOFF: Duration = Duration::from_secs(60);
+        const BACKOFF_MULTIPLIER: u32 = 2;
+
+        let mut backoff = INITIAL_BACKOFF;
+        let mut attempt = 1;
+
+        loop {
+            logger::log_info(&format!(
+                "Attempting to reconnect to {} (attempt {})...",
+                self.server_addr, attempt
+            ));
+
+            match TcpStream::connect(self.server_addr).await {
+                Ok(stream) => {
+                    self.connection = stream;
+                    logger::log_success("Reconnected to server!");
+
+                    // Rejoin the server with the same username
+                    if let Err(e) = self.join_server().await {
+                        logger::log_error(&format!("Failed to rejoin server: {:?}", e));
+                        return Err(e);
+                    }
+
+                    return Ok(());
+                }
+                Err(e) => {
+                    logger::log_warning(&format!(
+                        "Reconnection attempt {} failed: {}. Retrying in {:?}...",
+                        attempt, e, backoff
+                    ));
+                    sleep(backoff).await;
+
+                    // Exponential backoff with cap
+                    backoff = std::cmp::min(
+                        backoff.saturating_mul(BACKOFF_MULTIPLIER),
+                        MAX_BACKOFF
+                    );
+                    attempt += 1;
+                }
+            }
+        }
     }
 
     fn get_message_content(&self, message: &ChatMessage, msg_type_name: &str) -> Option<String> {
@@ -196,13 +245,20 @@ impl ChatClient {
                             self.handle_message(message).await;
                             self.display_prompt()?;
                         }
-                        Err(chat_shared::network::TcpMessageHandlerError::IoError(e)) => {
-                            logger::log_error(&format!("IO error: {:?}", e));
-                            return Err(e);
-                        }
+                        Err(chat_shared::network::TcpMessageHandlerError::IoError(_)) |
                         Err(chat_shared::network::TcpMessageHandlerError::Disconnect) => {
                             logger::log_warning("Disconnected from server");
-                            return Ok(());
+
+                            // Attempt to reconnect with exponential backoff
+                            match self.reconnect().await {
+                                Ok(()) => {
+                                    self.display_prompt()?;
+                                }
+                                Err(e) => {
+                                    logger::log_error(&format!("Failed to reconnect: {:?}", e));
+                                    return Err(io::Error::other("Reconnection failed"));
+                                }
+                            }
                         }
                     }
                 }

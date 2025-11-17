@@ -9,10 +9,12 @@ A modern, colorful terminal-based chat application written in Rust with async/aw
 - 🎨 **Colorized Output** - Beautiful, color-coded terminal interface with timestamps
 - 👥 **Multi-user Support** - Multiple clients can connect simultaneously
 - 🔄 **Real-time Messaging** - Instant message broadcasting to all connected users
+- 💬 **Direct Messaging** - Send private messages to specific users with `/dm` and `/r` commands
 - 🏷️ **Username Colorization** - Each user gets a unique, consistent color
 - ⚡ **Async I/O** - Built on Tokio for high-performance async networking
 - 🔧 **Modular Architecture** - Clean separation between client, server, and shared code
 - 🛡️ **Smart Username Handling** - Automatic renaming for duplicate usernames
+- 🔁 **Auto-Reconnect** - Exponential backoff reconnection when server goes down
 - 📊 **Rich Logging** - Categorized logs (INFO, ERROR, WARN, OK, SYSTEM, CHAT)
 
 ## Architecture
@@ -128,14 +130,46 @@ Each username is assigned a consistent color using hash-based selection from 12 
 
 If you try to join with a username that's already taken, the server automatically appends a random 4-digit suffix (e.g., `Alice_1234`).
 
+### Auto-Reconnect with Exponential Backoff
+
+If the connection to the server is lost, the client automatically attempts to reconnect with exponential backoff:
+- **Initial delay**: 1 second
+- **Maximum delay**: 60 seconds
+- **Strategy**: Doubles the wait time after each failed attempt (1s → 2s → 4s → 8s → 16s → 32s → 60s)
+- **Preservation**: Your username and last DM sender are preserved across reconnections
+- **Auto-rejoin**: Automatically rejoins the server with the same username when reconnected
+
+Example reconnection sequence:
+```
+Disconnected from server
+Attempting to reconnect to 127.0.0.1:8080 (attempt 1)...
+Reconnection attempt 1 failed: Connection refused. Retrying in 1s...
+Attempting to reconnect to 127.0.0.1:8080 (attempt 2)...
+Reconnection attempt 2 failed: Connection refused. Retrying in 2s...
+...
+Attempting to reconnect to 127.0.0.1:8080 (attempt 5)...
+Reconnected to server!
+Alice has joined the chat
+```
+
+### Direct Messaging
+
+Send private messages to specific users:
+- **Send a DM**: `/dm <username> <message>` - Send a direct message to a specific user
+- **Reply to DM**: `/r <message>` - Quick reply to the last person who sent you a DM
+- **Privacy**: The server logs that DMs are happening but doesn't display the message content
+- **Validation**: Server validates that the recipient exists before sending
+
 ### Message Protocol
 
 Messages are sent over TCP with a custom chunked protocol that supports:
 - Join notifications
 - Leave notifications
-- Direct Messages
-- Username renames
 - Chat messages
+- Direct messages
+- Username renames
+- User list requests
+- Error messages
 
 ## Building
 
