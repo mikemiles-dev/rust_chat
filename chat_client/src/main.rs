@@ -1,7 +1,7 @@
 mod client;
 mod input;
-mod logger;
 
+use chat_shared::logger;
 use client::ChatClient;
 use std::io::{self, Write};
 

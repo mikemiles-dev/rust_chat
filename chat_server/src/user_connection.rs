@@ -1,14 +1,13 @@
-use chat_shared::network::TcpMessageHandler;
+use chat_shared::logger;
+use chat_shared::message::{ChatMessage, MessageTypes};
+use chat_shared::network::{TcpMessageHandler, TcpMessageHandlerError};
+use rand::Rng;
 use std::collections::HashSet;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::{RwLock, broadcast};
-
-use chat_shared::message::{ChatMessage, MessageTypes};
-use chat_shared::network::TcpMessageHandlerError;
-use rand::Rng;
 
 pub struct UserConnection {
     socket: TcpStream,
@@ -60,7 +59,7 @@ impl UserConnection {
     }
 
     pub async fn handle(&mut self) -> Result<(), UserConnectionError> {
-        println!("New client connected: {}", self.addr);
+        logger::log_info(&format!("New client connected: {}", self.addr));
 
         let mut rx = self.tx.subscribe();
 
@@ -71,11 +70,11 @@ impl UserConnection {
                     match result {
                         Ok(msg) => {
                             if let Err(e) = self.process_message(msg).await {
-                                eprintln!("Error handling message from {}: {:?}", self.addr, e);
+                                logger::log_error(&format!("Error handling message from {}: {:?}", self.addr, e));
                             }
                         }
                         Err(TcpMessageHandlerError::IoError(e)) => {
-                            eprintln!("IO error reading from {}: {:?}", self.addr, e);
+                            logger::log_error(&format!("IO error reading from {}: {:?}", self.addr, e));
                             break;
                         }
                         Err(TcpMessageHandlerError::Disconnect) => {
@@ -88,7 +87,7 @@ impl UserConnection {
                                 ).map_err(|_| UserConnectionError::InvalidMessage)?;
                                 self.tx.send((leave_message, self.addr))
                                     .map_err(UserConnectionError::BroadcastError)?;
-                                println!(">>> User '{}' has left the chat.", chat_name);
+                                logger::log_system(&format!("{} has left the chat", chat_name));
                             }
                             break;
                         }
@@ -101,7 +100,7 @@ impl UserConnection {
                             self.send_message_chunked(msg).await.map_err(UserConnectionError::IoError)?;
                         }
                         Err(e) => {
-                            eprintln!("Broadcast receive error for {}: {:?}", self.addr, e);
+                            logger::log_error(&format!("Broadcast receive error for {}: {:?}", self.addr, e));
                             break;
                         }
                     }
@@ -153,7 +152,7 @@ impl UserConnection {
                 .map_err(UserConnectionError::BroadcastError)?;
             Ok(())
         } else {
-            eprintln!("User at {} sent chat message before joining.", self.addr);
+            logger::log_warning(&format!("User at {} sent chat message before joining", self.addr));
             Err(UserConnectionError::InvalidMessage)
         }
     }
@@ -169,13 +168,13 @@ impl UserConnection {
         if let Some(content) = username {
             let mut clients = connected_clients.write().await;
             self.chat_name = if !clients.insert(content.clone()) {
-                eprintln!(">>> User '{}' already exists. Renaming...", content);
+                logger::log_warning(&format!("User '{}' already exists, renaming...", content));
                 let new_name = self.randomize_username(&content);
                 if !clients.insert(new_name.clone()) {
-                    eprintln!(">>> Failed to assign random username to '{}'.", content);
+                    logger::log_error(&format!("Failed to assign random username to '{}'", content));
                     return Err(UserConnectionError::JoinError);
                 }
-                println!(">>> User '{}' renamed to '{}'.", content, new_name);
+                logger::log_success(&format!("User '{}' renamed to '{}'", content, new_name));
                 let rename_message = ChatMessage::try_new(
                     MessageTypes::UserRename,
                     Some(new_name.clone().into_bytes()),
@@ -198,7 +197,7 @@ impl UserConnection {
             self.tx
                 .send((join_message, self.addr))
                 .map_err(UserConnectionError::BroadcastError)?;
-            println!(">>> User '{}' has joined the chat.", chat_name);
+            logger::log_system(&format!("{} has joined the chat", chat_name));
         }
         Ok(())
     }

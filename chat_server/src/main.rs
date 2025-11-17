@@ -1,11 +1,11 @@
+use chat_shared::logger;
+use chat_shared::message::ChatMessage;
 use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::{env, io};
 use tokio::net::TcpListener;
 use tokio::sync::{RwLock, broadcast};
-
-use chat_shared::message::ChatMessage;
 
 mod user_connection;
 use user_connection::UserConnection;
@@ -38,7 +38,7 @@ impl ChatServer {
 
             tokio::spawn(async move {
                 if let Err(e) = client_connection.handle().await {
-                    eprintln!("Error handling client {}: {:?}", addr, e);
+                    logger::log_error(&format!("Error handling client {}: {:?}", addr, e));
                 }
             });
         }
@@ -55,15 +55,15 @@ async fn main() -> io::Result<()> {
         .parse::<usize>()
         .unwrap_or(100);
     let mut server = ChatServer::new(&chat_server_addr, max_clients).await?;
-    println!("Chat Server Started at {}", chat_server_addr);
-    println!(
-        "To change the address, set the {} environment variable to change.",
+    logger::log_success(&format!("Chat Server started at {}", chat_server_addr));
+    logger::log_info(&format!(
+        "To change address, set {} environment variable",
         CHAT_SERVER_ADDR_ENV_VAR
-    );
-    println!(
-        "To change the max clients, set the {} environment variable to change.",
+    ));
+    logger::log_info(&format!(
+        "To change max clients, set {} environment variable",
         CHAT_SERVER_MAX_CLIENTS_ENV_VAR
-    );
+    ));
 
     server.run().await
 }

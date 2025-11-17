@@ -1,4 +1,5 @@
-use crate::{input, logger};
+use crate::input;
+use chat_shared::logger;
 use chat_shared::message::{ChatMessage, ChatMessageError, MessageTypes};
 use chat_shared::network::TcpMessageHandler;
 use colored::Colorize;

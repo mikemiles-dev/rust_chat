@@ -74,6 +74,8 @@ dependencies = [
 name = "chat_shared"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "colored",
  "tokio",
 ]
 
