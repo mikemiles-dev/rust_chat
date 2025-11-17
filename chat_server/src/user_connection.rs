@@ -78,17 +78,7 @@ impl UserConnection {
                             break;
                         }
                         Err(TcpMessageHandlerError::Disconnect) => {
-                            if let Some(chat_name) = &self.chat_name {
-                                let mut clients = self.connected_clients.write().await;
-                                clients.remove(chat_name);
-                                let leave_message = ChatMessage::try_new(
-                                    MessageTypes::Leave,
-                                    Some(chat_name.clone().into_bytes()),
-                                ).map_err(|_| UserConnectionError::InvalidMessage)?;
-                                self.tx.send((leave_message, self.addr))
-                                    .map_err(UserConnectionError::BroadcastError)?;
-                                logger::log_system(&format!("{} has left the chat", chat_name));
-                            }
+                            logger::log_warning(&format!("Client {} disconnected", self.addr));
                             break;
                         }
                     };
@@ -97,7 +87,11 @@ impl UserConnection {
                 result = rx.recv() => {
                     match result {
                         Ok((msg, _src_addr)) => {
-                            self.send_message_chunked(msg).await.map_err(UserConnectionError::IoError)?;
+                            if let Err(e) = self.send_message_chunked(msg).await {
+                                logger::log_warning(&format!("Failed to send message to {}: {:?}", self.addr, e));
+                                // Client likely disconnected, break to clean up
+                                break;
+                            }
                         }
                         Err(e) => {
                             logger::log_error(&format!("Broadcast receive error for {}: {:?}", self.addr, e));
@@ -106,6 +100,19 @@ impl UserConnection {
                     }
                 }
             }
+        }
+
+        // Cleanup on disconnect
+        if let Some(chat_name) = &self.chat_name {
+            let mut clients = self.connected_clients.write().await;
+            clients.remove(chat_name);
+            if let Ok(leave_message) = ChatMessage::try_new(
+                MessageTypes::Leave,
+                Some(chat_name.clone().into_bytes()),
+            ) {
+                let _ = self.tx.send((leave_message, self.addr));
+            }
+            logger::log_system(&format!("{} has left the chat", chat_name));
         }
 
         Ok(())

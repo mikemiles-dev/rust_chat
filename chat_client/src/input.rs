@@ -14,6 +14,7 @@ pub enum UserInput {
 pub enum UserInputError {
     IoError,
     InvalidCommand,
+    #[allow(dead_code)]
     InvalidUser,
 }
 

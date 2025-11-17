@@ -6,6 +6,7 @@ use colored::Colorize;
 use std::io::{self, Write};
 use std::net::{AddrParseError, SocketAddr};
 use std::time::Duration;
+use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::time::sleep;
 
@@ -65,6 +66,12 @@ impl ChatClient {
         const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
         const MAX_BACKOFF: Duration = Duration::from_secs(60);
         const BACKOFF_MULTIPLIER: u32 = 2;
+
+        // Explicitly shutdown the old connection before reconnecting
+        let _ = self.connection.shutdown().await;
+
+        // Give the server time to detect the closure and clean up
+        sleep(Duration::from_millis(100)).await;
 
         let mut backoff = INITIAL_BACKOFF;
         let mut attempt = 1;
@@ -151,20 +158,19 @@ impl ChatClient {
                 }
             }
             MessageTypes::DirectMessage => {
-                if let Some(content) = self.get_message_content(&message, "dm") {
-                    if let Some((sender, rest)) = content.split_once('|') {
-                        if let Some((recipient, msg)) = rest.split_once('|') {
-                            // Display if we are the recipient
-                            if recipient == self.chat_name {
-                                logger::log_warning(&format!("[DM from {}]: {}", sender, msg));
-                                // Track the sender so we can reply with /r
-                                self.last_dm_sender = Some(sender.to_string());
-                            }
-                            // Display if we are the sender (confirmation)
-                            else if sender == self.chat_name {
-                                logger::log_info(&format!("[DM to {}]: {}", recipient, msg));
-                            }
-                        }
+                if let Some(content) = self.get_message_content(&message, "dm")
+                    && let Some((sender, rest)) = content.split_once('|')
+                    && let Some((recipient, msg)) = rest.split_once('|')
+                {
+                    // Display if we are the recipient
+                    if recipient == self.chat_name {
+                        logger::log_warning(&format!("[DM from {}]: {}", sender, msg));
+                        // Track the sender so we can reply with /r
+                        self.last_dm_sender = Some(sender.to_string());
+                    }
+                    // Display if we are the sender (confirmation)
+                    else if sender == self.chat_name {
+                        logger::log_info(&format!("[DM to {}]: {}", recipient, msg));
                     }
                 }
             }
