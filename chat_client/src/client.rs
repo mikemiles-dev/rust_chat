@@ -191,12 +191,20 @@ impl ChatClient {
     ) -> Result<(), ChatClientError> {
         match user_input {
             input::UserInput::Message(msg) => {
+                if msg.trim().is_empty() {
+                    logger::log_error("Cannot send empty message");
+                    return Ok(());
+                }
                 let message =
                     ChatMessage::try_new(MessageTypes::ChatMessage, Some(msg.into_bytes()))?;
                 self.send_message_chunked(message).await?;
                 Ok(())
             }
             input::UserInput::DirectMessage { recipient, message: msg } => {
+                if msg.trim().is_empty() {
+                    logger::log_error("Cannot send empty direct message");
+                    return Ok(());
+                }
                 let dm_content = format!("{}|{}", recipient, msg);
                 let message =
                     ChatMessage::try_new(MessageTypes::DirectMessage, Some(dm_content.into_bytes()))?;
@@ -204,6 +212,10 @@ impl ChatClient {
                 Ok(())
             }
             input::UserInput::Reply(msg) => {
+                if msg.trim().is_empty() {
+                    logger::log_error("Cannot send empty reply");
+                    return Ok(());
+                }
                 if let Some(recipient) = &self.last_dm_sender {
                     let dm_content = format!("{}|{}", recipient, msg);
                     let message =
