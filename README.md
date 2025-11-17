@@ -2,6 +2,8 @@
 
 A modern, colorful terminal-based chat application written in Rust with async/await support.
 
+![Usage](usage.png)
+
 ## Features
 
 - 🎨 **Colorized Output** - Beautiful, color-coded terminal interface with timestamps
@@ -191,7 +193,3 @@ This project is available for educational and personal use.
 - [ ] File sharing
 - [ ] Encryption
 - [ ] GUI client
-
----
-
-![Usage](usage.png)
