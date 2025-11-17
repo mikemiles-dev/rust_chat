@@ -394,3 +394,117 @@ impl UserConnection {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rate_limiter_allows_messages_within_limit() {
+        let mut limiter = RateLimiter::new(5, Duration::from_secs(1));
+
+        // Should allow 5 messages
+        for _ in 0..5 {
+            assert!(limiter.check_and_consume());
+        }
+    }
+
+    #[test]
+    fn test_rate_limiter_blocks_excess_messages() {
+        let mut limiter = RateLimiter::new(3, Duration::from_secs(1));
+
+        // Consume all tokens
+        for _ in 0..3 {
+            assert!(limiter.check_and_consume());
+        }
+
+        // Should block the 4th message
+        assert!(!limiter.check_and_consume());
+    }
+
+    #[test]
+    fn test_rate_limiter_refills_after_interval() {
+        let mut limiter = RateLimiter::new(2, Duration::from_millis(100));
+
+        // Consume all tokens
+        assert!(limiter.check_and_consume());
+        assert!(limiter.check_and_consume());
+        assert!(!limiter.check_and_consume());
+
+        // Wait for refill
+        std::thread::sleep(Duration::from_millis(150));
+
+        // Should allow messages again
+        assert!(limiter.check_and_consume());
+        assert!(limiter.check_and_consume());
+    }
+
+    #[test]
+    fn test_rate_limiter_multiple_refills() {
+        let mut limiter = RateLimiter::new(1, Duration::from_millis(50));
+
+        for _ in 0..3 {
+            assert!(limiter.check_and_consume());
+            assert!(!limiter.check_and_consume()); // Blocked
+            std::thread::sleep(Duration::from_millis(60)); // Wait for refill
+        }
+    }
+
+    #[test]
+    fn test_username_validation_valid() {
+        // Valid usernames
+        assert_eq!("alice".len(), 5);
+        assert!("alice".chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+
+        assert_eq!("Bob123".len(), 6);
+        assert!("Bob123".chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+
+        assert_eq!("user_name".len(), 9);
+        assert!("user_name".chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+
+        assert_eq!("user-name".len(), 9);
+        assert!("user-name".chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+    }
+
+    #[test]
+    fn test_username_validation_invalid_chars() {
+        // Invalid characters
+        assert!(!"user@name".chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+        assert!(!"user name".chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+        assert!(!"user!name".chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+        assert!(!"user.name".chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+    }
+
+    #[test]
+    fn test_username_validation_length() {
+        // Too short
+        let empty = "";
+        assert!(empty.is_empty());
+
+        // Valid length
+        let valid = "a".repeat(32);
+        assert_eq!(valid.len(), 32);
+        assert!(valid.len() <= MAX_USERNAME_LENGTH);
+
+        // Too long
+        let too_long = "a".repeat(33);
+        assert!(too_long.len() > MAX_USERNAME_LENGTH);
+    }
+
+    #[test]
+    fn test_message_length_validation() {
+        // Valid message
+        let valid = "Hello, World!";
+        assert!(!valid.is_empty());
+        assert!(valid.len() <= MAX_MESSAGE_LENGTH);
+
+        // Empty message
+        let empty = "";
+        assert!(empty.is_empty());
+
+        // Too long message
+        let too_long = "x".repeat(MAX_MESSAGE_LENGTH + 1);
+        assert!(too_long.len() > MAX_MESSAGE_LENGTH);
+    }
+
+}

@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MessageTypes {
     ChatMessage,
     Join,
@@ -121,5 +121,121 @@ impl From<ChatMessage> for Vec<u8> {
             buffer.extend_from_slice(&content);
         }
         buffer
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_message_creation_valid() {
+        let content = b"Hello, World!".to_vec();
+        let msg = ChatMessage::try_new(MessageTypes::ChatMessage, Some(content.clone()));
+        assert!(msg.is_ok());
+        let msg = msg.unwrap();
+        assert_eq!(msg.msg_type, MessageTypes::ChatMessage);
+        assert_eq!(msg.content, Some(content));
+    }
+
+    #[test]
+    fn test_message_creation_none_content() {
+        let msg = ChatMessage::try_new(MessageTypes::ListUsers, None);
+        assert!(msg.is_ok());
+        let msg = msg.unwrap();
+        assert_eq!(msg.msg_len, 3);
+        assert_eq!(msg.content, None);
+    }
+
+    #[test]
+    fn test_message_exceeds_max_size() {
+        // Create a message that's too large (> 65KB)
+        let large_content = vec![0u8; 70000];
+        let msg = ChatMessage::try_new(MessageTypes::ChatMessage, Some(large_content));
+        assert!(msg.is_err());
+    }
+
+    #[test]
+    fn test_message_serialization() {
+        let content = b"Test".to_vec();
+        let msg = ChatMessage::try_new(MessageTypes::ChatMessage, Some(content.clone())).unwrap();
+        let serialized: Vec<u8> = msg.clone().into();
+
+        // Check structure: [2 bytes len][1 byte type][content]
+        assert_eq!(serialized.len(), 2 + 1 + content.len());
+        assert_eq!(serialized[2], 1); // ChatMessage type
+        assert_eq!(&serialized[3..], content.as_slice());
+    }
+
+    #[test]
+    fn test_message_deserialization() {
+        let mut buffer = vec![];
+        buffer.extend_from_slice(&7u16.to_be_bytes()); // length
+        buffer.push(1); // ChatMessage type
+        buffer.extend_from_slice(b"Test");
+
+        let msg = ChatMessage::from(buffer);
+        assert_eq!(msg.msg_type, MessageTypes::ChatMessage);
+        assert_eq!(msg.content_as_string(), Some("Test".to_string()));
+    }
+
+    #[test]
+    fn test_message_roundtrip() {
+        let original_content = b"Hello, World!".to_vec();
+        let original_msg = ChatMessage::try_new(
+            MessageTypes::DirectMessage,
+            Some(original_content.clone())
+        ).unwrap();
+
+        let serialized: Vec<u8> = original_msg.into();
+        let deserialized = ChatMessage::from(serialized);
+
+        assert_eq!(deserialized.msg_type, MessageTypes::DirectMessage);
+        assert_eq!(deserialized.content, Some(original_content));
+    }
+
+    #[test]
+    fn test_message_types_from_u8() {
+        assert!(matches!(MessageTypes::from(1), MessageTypes::ChatMessage));
+        assert!(matches!(MessageTypes::from(2), MessageTypes::Join));
+        assert!(matches!(MessageTypes::from(3), MessageTypes::Leave));
+        assert!(matches!(MessageTypes::from(4), MessageTypes::UserRename));
+        assert!(matches!(MessageTypes::from(5), MessageTypes::ListUsers));
+        assert!(matches!(MessageTypes::from(6), MessageTypes::DirectMessage));
+        assert!(matches!(MessageTypes::from(7), MessageTypes::Error));
+        assert!(matches!(MessageTypes::from(99), MessageTypes::Unknown(99)));
+    }
+
+    #[test]
+    fn test_empty_buffer_deserialization() {
+        let msg = ChatMessage::from(vec![]);
+        assert_eq!(msg.msg_len, 3);
+        assert!(matches!(msg.msg_type, MessageTypes::Unknown(0)));
+        assert_eq!(msg.content, None);
+    }
+
+    #[test]
+    fn test_short_buffer_deserialization() {
+        let msg = ChatMessage::from(vec![0, 1]); // Too short
+        assert_eq!(msg.msg_len, 3);
+        assert!(matches!(msg.msg_type, MessageTypes::Unknown(0)));
+    }
+
+    #[test]
+    fn test_content_as_string_valid_utf8() {
+        let msg = ChatMessage::try_new(
+            MessageTypes::ChatMessage,
+            Some(b"Valid UTF-8".to_vec())
+        ).unwrap();
+        assert_eq!(msg.content_as_string(), Some("Valid UTF-8".to_string()));
+    }
+
+    #[test]
+    fn test_content_as_string_invalid_utf8() {
+        let msg = ChatMessage::try_new(
+            MessageTypes::ChatMessage,
+            Some(vec![0xFF, 0xFE, 0xFD]) // Invalid UTF-8
+        ).unwrap();
+        assert_eq!(msg.content_as_string(), None);
     }
 }
