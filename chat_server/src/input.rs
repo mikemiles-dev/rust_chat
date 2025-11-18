@@ -1,0 +1,91 @@
+use chat_shared::input::{UserInput, UserInputError};
+
+#[derive(Debug)]
+pub enum ServerUserInput {
+    Help,
+    ListUsers,
+    Quit,
+}
+
+impl UserInput for ServerUserInput {
+    fn get_quit_command() -> Self {
+        ServerUserInput::Quit
+    }
+}
+
+impl TryFrom<&str> for ServerUserInput {
+    type Error = UserInputError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let trimmed = value.trim();
+
+        match trimmed {
+            "/quit" | "/q" => Ok(ServerUserInput::Quit),
+            "/list" => Ok(ServerUserInput::ListUsers),
+            "/help" | "/h" => Ok(ServerUserInput::Help),
+            _ => {
+                if trimmed.starts_with('/') {
+                    Err(UserInputError::InvalidCommand)
+                } else {
+                    // Ignore non-command input on server
+                    Err(UserInputError::InvalidCommand)
+                }
+            }
+        }
+    }
+}
+
+impl TryFrom<String> for ServerUserInput {
+    type Error = UserInputError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_quit_command() {
+        let input = ServerUserInput::try_from("/quit");
+        assert!(input.is_ok());
+        assert!(matches!(input.unwrap(), ServerUserInput::Quit));
+    }
+
+    #[test]
+    fn test_quit_short_command() {
+        let input = ServerUserInput::try_from("/q");
+        assert!(input.is_ok());
+        assert!(matches!(input.unwrap(), ServerUserInput::Quit));
+    }
+
+    #[test]
+    fn test_help_command() {
+        let input = ServerUserInput::try_from("/help");
+        assert!(input.is_ok());
+        assert!(matches!(input.unwrap(), ServerUserInput::Help));
+    }
+
+    #[test]
+    fn test_list_command() {
+        let input = ServerUserInput::try_from("/list");
+        assert!(input.is_ok());
+        assert!(matches!(input.unwrap(), ServerUserInput::ListUsers));
+    }
+
+    #[test]
+    fn test_invalid_command() {
+        let input = ServerUserInput::try_from("/unknown");
+        assert!(input.is_err());
+        assert!(matches!(input.unwrap_err(), UserInputError::InvalidCommand));
+    }
+
+    #[test]
+    fn test_whitespace_trimming() {
+        let input = ServerUserInput::try_from("  /help  ");
+        assert!(input.is_ok());
+        assert!(matches!(input.unwrap(), ServerUserInput::Help));
+    }
+}
