@@ -43,6 +43,7 @@ pub struct ChatClient {
     chat_name: String,
     last_dm_sender: Option<String>,
     connected_users: Arc<RwLock<HashSet<String>>>,
+    was_kicked: bool,
 }
 
 impl ChatClient {
@@ -56,6 +57,7 @@ impl ChatClient {
             chat_name: name,
             last_dm_sender: None,
             connected_users: Arc::new(RwLock::new(HashSet::new())),
+            was_kicked: false,
         })
     }
 
@@ -183,6 +185,10 @@ impl ChatClient {
             MessageTypes::Error => {
                 if let Some(content) = self.get_message_content(&message, "error") {
                     logger::log_error(&content);
+                    // Check if this is a kick message
+                    if content.contains("kicked") {
+                        self.was_kicked = true;
+                    }
                 }
             }
             _ => {
@@ -282,6 +288,12 @@ impl ChatClient {
                         Err(chat_shared::network::TcpMessageHandlerError::IoError(_)) |
                         Err(chat_shared::network::TcpMessageHandlerError::Disconnect) => {
                             logger::log_warning("Disconnected from server");
+
+                            // Don't reconnect if we were kicked
+                            if self.was_kicked {
+                                logger::log_info("Not reconnecting - you were kicked from the server");
+                                return Ok(());
+                            }
 
                             // Attempt to reconnect with exponential backoff
                             match self.reconnect().await {
