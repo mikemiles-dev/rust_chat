@@ -6,6 +6,7 @@ pub use error::UserConnectionError;
 use handlers::MessageHandlers;
 use rate_limiting::{RateLimiter, RATE_LIMIT_MESSAGES, RATE_LIMIT_WINDOW};
 
+use crate::ServerCommand;
 use chat_shared::logger;
 use chat_shared::message::{ChatMessage, MessageTypes};
 use chat_shared::network::{TcpMessageHandler, TcpMessageHandlerError};
@@ -19,6 +20,7 @@ pub struct UserConnection {
     socket: TcpStream,
     addr: SocketAddr,
     tx: broadcast::Sender<(ChatMessage, SocketAddr)>,
+    server_commands: broadcast::Sender<ServerCommand>,
     connected_clients: Arc<RwLock<HashSet<String>>>,
     chat_name: Option<String>,
     rate_limiter: RateLimiter,
@@ -35,12 +37,14 @@ impl UserConnection {
         socket: TcpStream,
         addr: SocketAddr,
         tx: broadcast::Sender<(ChatMessage, SocketAddr)>,
+        server_commands: broadcast::Sender<ServerCommand>,
         connected_clients: Arc<RwLock<HashSet<String>>>,
     ) -> Self {
         UserConnection {
             socket,
             addr,
             tx,
+            server_commands,
             connected_clients,
             chat_name: None,
             rate_limiter: RateLimiter::new(RATE_LIMIT_MESSAGES, RATE_LIMIT_WINDOW),
@@ -51,6 +55,7 @@ impl UserConnection {
         logger::log_info(&format!("New client connected: {}", self.addr));
 
         let mut rx = self.tx.subscribe();
+        let mut cmd_rx = self.server_commands.subscribe();
 
         loop {
             tokio::select! {
@@ -85,6 +90,28 @@ impl UserConnection {
                         Err(e) => {
                             logger::log_error(&format!("Broadcast receive error for {}: {:?}", self.addr, e));
                             break;
+                        }
+                    }
+                }
+                // Branch 3: Server commands (kick, etc.)
+                result = cmd_rx.recv() => {
+                    match result {
+                        Ok(ServerCommand::Kick(username)) => {
+                            if let Some(chat_name) = &self.chat_name
+                                && chat_name == &username {
+                                logger::log_info(&format!("User {} kicked by server", chat_name));
+                                // Send error message to client before disconnecting
+                                if let Ok(kick_msg) = ChatMessage::try_new(
+                                    MessageTypes::Error,
+                                    Some("You have been kicked by the server".as_bytes().to_vec())
+                                ) {
+                                    let _ = self.send_message_chunked(kick_msg).await;
+                                }
+                                break;
+                            }
+                        }
+                        Err(_) => {
+                            // Channel closed, ignore
                         }
                     }
                 }

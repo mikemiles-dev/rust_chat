@@ -18,6 +18,7 @@ impl ServerCompleter {
                 "/quit".to_string(),
                 "/q".to_string(),
                 "/list".to_string(),
+                "/kick".to_string(),
             ],
         }
     }

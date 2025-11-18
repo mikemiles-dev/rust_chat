@@ -15,9 +15,15 @@ mod user_connection;
 use input::ServerUserInput;
 use user_connection::UserConnection;
 
+#[derive(Debug, Clone)]
+pub enum ServerCommand {
+    Kick(String),
+}
+
 pub struct ChatServer {
     listener: TcpListener,
     broadcaster: broadcast::Sender<(ChatMessage, SocketAddr)>,
+    server_commands: broadcast::Sender<ServerCommand>,
     connected_clients: Arc<RwLock<HashSet<String>>>,
     max_clients: usize,
     active_connections: Arc<AtomicUsize>,
@@ -26,11 +32,13 @@ pub struct ChatServer {
 impl ChatServer {
     async fn new(bind_addr: &str, max_clients: usize) -> io::Result<Self> {
         let (tx, _rx) = broadcast::channel(max_clients * 16); // Allow message buffering
+        let (cmd_tx, _cmd_rx) = broadcast::channel(100); // Server commands channel
         let listener = TcpListener::bind(bind_addr).await?;
 
         Ok(ChatServer {
             listener,
             broadcaster: tx,
+            server_commands: cmd_tx,
             connected_clients: Arc::new(RwLock::new(HashSet::new())),
             max_clients,
             active_connections: Arc::new(AtomicUsize::new(0)),
@@ -61,10 +69,11 @@ impl ChatServer {
                             self.active_connections.fetch_add(1, Ordering::Relaxed);
 
                             let tx_clone = self.broadcaster.clone();
+                            let cmd_tx_clone = self.server_commands.clone();
                             let active_connections_clone = self.active_connections.clone();
 
                             let mut client_connection =
-                                UserConnection::new(socket, addr, tx_clone, self.connected_clients.clone());
+                                UserConnection::new(socket, addr, tx_clone, cmd_tx_clone, self.connected_clients.clone());
 
                             tokio::spawn(async move {
                                 if let Err(e) = client_connection.handle().await {
@@ -92,6 +101,9 @@ impl ChatServer {
                                 }
                                 Ok(ServerUserInput::ListUsers) => {
                                     self.handle_list_users().await;
+                                }
+                                Ok(ServerUserInput::Kick(username)) => {
+                                    self.handle_kick(username).await;
                                 }
                                 Ok(ServerUserInput::Help) => {
                                     self.handle_help();
@@ -125,11 +137,25 @@ impl ChatServer {
         }
     }
 
+    async fn handle_kick(&self, username: String) {
+        let clients = self.connected_clients.read().await;
+        if clients.contains(&username) {
+            drop(clients);
+            // Send kick command to all connections - the matching one will disconnect
+            if self.server_commands.send(ServerCommand::Kick(username.clone())).is_ok() {
+                logger::log_warning(&format!("Kicking user: {}", username));
+            }
+        } else {
+            logger::log_error(&format!("User '{}' not found", username));
+        }
+    }
+
     fn handle_help(&self) {
         logger::log_info("Available server commands:");
-        logger::log_info("  /list    - List all connected users");
-        logger::log_info("  /help    - Show this help message");
-        logger::log_info("  /quit    - Shutdown the server");
+        logger::log_info("  /list           - List all connected users");
+        logger::log_info("  /kick <user>    - Kick a user from the server");
+        logger::log_info("  /help           - Show this help message");
+        logger::log_info("  /quit           - Shutdown the server");
     }
 }
 

@@ -4,6 +4,7 @@ use chat_shared::input::{UserInput, UserInputError};
 pub enum ServerUserInput {
     Help,
     ListUsers,
+    Kick(String),
     Quit,
 }
 
@@ -24,7 +25,14 @@ impl TryFrom<&str> for ServerUserInput {
             "/list" => Ok(ServerUserInput::ListUsers),
             "/help" | "/h" => Ok(ServerUserInput::Help),
             _ => {
-                if trimmed.starts_with('/') {
+                if let Some(username) = trimmed.strip_prefix("/kick ") {
+                    let username = username.trim();
+                    if username.is_empty() {
+                        Err(UserInputError::InvalidCommand)
+                    } else {
+                        Ok(ServerUserInput::Kick(username.to_string()))
+                    }
+                } else if trimmed.starts_with('/') {
                     Err(UserInputError::InvalidCommand)
                 } else {
                     // Ignore non-command input on server
@@ -87,5 +95,37 @@ mod tests {
         let input = ServerUserInput::try_from("  /help  ");
         assert!(input.is_ok());
         assert!(matches!(input.unwrap(), ServerUserInput::Help));
+    }
+
+    #[test]
+    fn test_kick_command() {
+        let input = ServerUserInput::try_from("/kick Alice");
+        assert!(input.is_ok());
+        match input.unwrap() {
+            ServerUserInput::Kick(username) => assert_eq!(username, "Alice"),
+            _ => panic!("Expected Kick variant"),
+        }
+    }
+
+    #[test]
+    fn test_kick_command_with_whitespace() {
+        let input = ServerUserInput::try_from("/kick   Bob  ");
+        assert!(input.is_ok());
+        match input.unwrap() {
+            ServerUserInput::Kick(username) => assert_eq!(username, "Bob"),
+            _ => panic!("Expected Kick variant"),
+        }
+    }
+
+    #[test]
+    fn test_kick_command_no_username() {
+        let input = ServerUserInput::try_from("/kick");
+        assert!(input.is_err());
+    }
+
+    #[test]
+    fn test_kick_command_empty_username() {
+        let input = ServerUserInput::try_from("/kick   ");
+        assert!(input.is_err());
     }
 }

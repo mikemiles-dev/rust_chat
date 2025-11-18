@@ -85,6 +85,7 @@ While the server is running, administrators can use these commands:
 
 - `/help` or `/h` - Display available server commands
 - `/list` - Show all currently connected users with count
+- `/kick <username>` - Kick a user from the server
 - `/quit` or `/q` - Gracefully shutdown the server
 
 ### Command History & Autocomplete
@@ -156,8 +157,11 @@ Alice /r Perfect! Let's discuss the project.
 [12:35:35] [INFO]   - Alice
 [12:35:35] [INFO]   - Bob
 [12:35:35] [INFO]   - Charlie
+/kick Bob
+[12:35:45] [WARN] Kicking user: Bob
+[12:35:45] [SYSTEM] Bob has left the chat
 /quit
-[12:35:40] [INFO] Server shutting down...
+[12:35:50] [INFO] Server shutting down...
 ```
 
 ## Project Structure
