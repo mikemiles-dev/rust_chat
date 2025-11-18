@@ -55,4 +55,4 @@ EXPOSE 8080
 ENV CHAT_SERVER_ADDR="0.0.0.0:8080"
 ENV CHAT_SERVER_MAX_CLIENTS="100"
 
-CMD ["./chat_server"]
+ENTRYPOINT ["/app/chat_server"]

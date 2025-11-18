@@ -46,8 +46,13 @@ impl ChatServer {
     }
 
     async fn run(&mut self) -> io::Result<()> {
-        // Spawn readline handler in a blocking thread
+        // Spawn readline handler in a blocking thread (if TTY available)
         let mut readline_rx = readline_helper::spawn_readline_handler();
+
+        if readline_rx.is_none() {
+            logger::log_info("Running in non-interactive mode (no TTY)");
+            logger::log_info("Server commands disabled - use docker exec for admin tasks");
+        }
 
         loop {
             tokio::select! {
@@ -90,8 +95,13 @@ impl ChatServer {
                         }
                     }
                 }
-                // Handle server commands from readline
-                Some(line) = readline_rx.recv() => {
+                // Handle server commands from readline (only if TTY available)
+                Some(line) = async {
+                    match &mut readline_rx {
+                        Some(rx) => rx.recv().await,
+                        None => std::future::pending().await, // Never resolves if no TTY
+                    }
+                } => {
                     match line {
                         Some(input_line) => {
                             match ServerUserInput::try_from(input_line.as_str()) {
