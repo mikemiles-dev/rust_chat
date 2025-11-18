@@ -36,7 +36,63 @@ The project is organized into three crates:
 
 ## Quick Start
 
-### Starting the Server
+### Option 1: Docker Deployment (Recommended for Production)
+
+The easiest way to deploy with automatic HTTPS/TLS encryption:
+
+#### Prerequisites
+- Docker and Docker Compose installed
+- A domain name pointing to your server (for automatic HTTPS)
+
+#### Setup
+
+1. **Configure your domain** in `Caddyfile`:
+   ```bash
+   # Edit Caddyfile and replace:
+   # - your-email@example.com (for Let's Encrypt notifications)
+   # - chat.yourdomain.com (with your actual domain)
+   ```
+
+2. **Start the services**:
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **View logs**:
+   ```bash
+   docker-compose logs -f
+   ```
+
+4. **Stop the services**:
+   ```bash
+   docker-compose down
+   ```
+
+That's it! Caddy automatically:
+- Obtains Let's Encrypt TLS certificates
+- Renews certificates before expiry
+- Redirects HTTP to HTTPS
+- Handles TLS termination
+
+#### Connect to your server
+
+```bash
+# Client connects via TLS (port 443)
+cargo run --bin chat_client
+# Enter: chat.yourdomain.com:443
+```
+
+#### Local Development (without domain)
+
+For testing locally without a domain:
+```bash
+docker-compose up -d
+# Connect to localhost:8443 (no TLS verification needed for dev)
+```
+
+### Option 2: Local Development (No Docker)
+
+#### Starting the Server
 
 ```bash
 cargo run --bin chat_server
@@ -56,7 +112,7 @@ CHAT_SERVER_ADDR="127.0.0.1:9000" cargo run --bin chat_server
 CHAT_SERVER_MAX_CLIENTS="50" cargo run --bin chat_server
 ```
 
-### Starting the Client
+#### Starting the Client
 
 ```bash
 cargo run --bin chat_client
@@ -392,6 +448,73 @@ cargo clippy --all-targets --all-features
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
+## Production Deployment
+
+### Deploying to Digital Ocean (or any VPS)
+
+1. **Set up your droplet**:
+   - Create a droplet with Docker pre-installed
+   - Point your domain's A record to the droplet's IP
+
+2. **Clone and configure**:
+   ```bash
+   git clone <your-repo>
+   cd rust_chat
+
+   # Edit Caddyfile with your domain and email
+   nano Caddyfile
+   ```
+
+3. **Deploy**:
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Monitor**:
+   ```bash
+   # View logs
+   docker-compose logs -f
+
+   # Check certificate status
+   docker exec caddy_proxy caddy list-certificates
+   ```
+
+### Architecture
+
+```
+Internet (Port 443/80)
+         ↓
+    Caddy (TLS Termination)
+    - Auto Let's Encrypt
+    - Certificate renewal
+    - HTTP → HTTPS redirect
+         ↓
+  Chat Server (Port 8080)
+  - Plain TCP internally
+  - Isolated network
+```
+
+### Security Notes
+
+- **TLS/HTTPS**: Caddy automatically obtains and renews Let's Encrypt certificates
+- **Network Isolation**: Chat server only accessible via Caddy reverse proxy
+- **Non-root User**: Application runs as unprivileged user in container
+- **Certificate Persistence**: Certificates stored in Docker volume (survives restarts)
+- **Firewall**: Only ports 80 and 443 need to be open
+
+### Updating
+
+```bash
+# Pull latest changes
+git pull
+
+# Rebuild and restart
+docker-compose up -d --build
+
+# Remove old images
+docker image prune -f
+```
+
 ## Dependencies
 
 ### Core
@@ -402,6 +525,10 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 ### Server-specific
 - **rand** - Random username generation for collision handling
+
+### Deployment
+- **Docker** - Container runtime
+- **Caddy** - Reverse proxy with automatic HTTPS
 
 ## Contributing
 
@@ -416,7 +543,7 @@ This project is available for educational and personal use.
 
 ## Future Enhancements
 
-- [ ] TLS/SSL encryption for network traffic
+- [x] **TLS/SSL encryption** - ✅ Implemented via Caddy reverse proxy
 - [ ] End-to-end encryption for direct messages
 - [ ] User authentication system
 - [ ] Chat rooms/channels
