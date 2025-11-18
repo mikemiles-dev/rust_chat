@@ -3,9 +3,8 @@ use crate::readline_helper;
 use chat_shared::logger;
 use chat_shared::message::{ChatMessage, ChatMessageError, MessageTypes};
 use chat_shared::network::TcpMessageHandler;
-use colored::Colorize;
 use std::collections::HashSet;
-use std::io::{self, Write};
+use std::io;
 use std::net::{AddrParseError, SocketAddr};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -173,15 +172,11 @@ impl ChatClient {
                     && let Some((sender, rest)) = content.split_once('|')
                     && let Some((recipient, msg)) = rest.split_once('|')
                 {
-                    // Display if we are the recipient
+                    // Only display if we are the recipient (not the sender - we already showed it locally)
                     if recipient == self.chat_name {
                         logger::log_warning(&format!("[DM from {}]: {}", sender, msg));
                         // Track the sender so we can reply with /r
                         self.last_dm_sender = Some(sender.to_string());
-                    }
-                    // Display if we are the sender (confirmation)
-                    else if sender == self.chat_name {
-                        logger::log_info(&format!("[DM to {}]: {}", recipient, msg));
                     }
                 }
             }
@@ -203,9 +198,12 @@ impl ChatClient {
         match user_input {
             input::ClientUserInput::Message(msg) => {
                 if msg.trim().is_empty() {
-                    logger::log_error("Cannot send empty message");
                     return Ok(());
                 }
+                // Display locally immediately
+                let display_msg = format!("{}: {}", self.chat_name, msg);
+                logger::log_chat(&display_msg);
+
                 let message =
                     ChatMessage::try_new(MessageTypes::ChatMessage, Some(msg.into_bytes()))?;
                 self.send_message_chunked(message).await?;
@@ -216,9 +214,11 @@ impl ChatClient {
                 message: msg,
             } => {
                 if msg.trim().is_empty() {
-                    logger::log_error("Cannot send empty direct message");
                     return Ok(());
                 }
+                // Display DM locally immediately
+                logger::log_info(&format!("[DM to {}]: {}", recipient, msg));
+
                 let dm_content = format!("{}|{}", recipient, msg);
                 let message = ChatMessage::try_new(
                     MessageTypes::DirectMessage,
@@ -229,10 +229,12 @@ impl ChatClient {
             }
             input::ClientUserInput::Reply(msg) => {
                 if msg.trim().is_empty() {
-                    logger::log_error("Cannot send empty reply");
                     return Ok(());
                 }
                 if let Some(recipient) = &self.last_dm_sender {
+                    // Display reply locally immediately
+                    logger::log_info(&format!("[DM to {}]: {}", recipient, msg));
+
                     let dm_content = format!("{}|{}", recipient, msg);
                     let message = ChatMessage::try_new(
                         MessageTypes::DirectMessage,
@@ -263,15 +265,12 @@ impl ChatClient {
         }
     }
 
-    fn display_prompt(&self) -> io::Result<()> {
-        print!("{} ", self.chat_name.bright_cyan().bold());
-        io::stdout().flush()
-    }
-
     pub async fn run(&mut self) -> io::Result<()> {
-        // Spawn readline handler in a blocking thread
-        let mut readline_rx = readline_helper::spawn_readline_handler(self.connected_users.clone());
-        self.display_prompt()?;
+        // Spawn readline handler in a blocking thread with username as prompt
+        let mut readline_rx = readline_helper::spawn_readline_handler(
+            self.connected_users.clone(),
+            self.chat_name.clone(),
+        );
 
         loop {
             tokio::select! {
@@ -279,7 +278,6 @@ impl ChatClient {
                     match result {
                         Ok(message) => {
                             self.handle_message(message).await;
-                            self.display_prompt()?;
                         }
                         Err(chat_shared::network::TcpMessageHandlerError::IoError(_)) |
                         Err(chat_shared::network::TcpMessageHandlerError::Disconnect) => {
@@ -288,7 +286,7 @@ impl ChatClient {
                             // Attempt to reconnect with exponential backoff
                             match self.reconnect().await {
                                 Ok(()) => {
-                                    self.display_prompt()?;
+                                    // Connection restored
                                 }
                                 Err(e) => {
                                     logger::log_error(&format!("Failed to reconnect: {:?}", e));
@@ -308,17 +306,14 @@ impl ChatClient {
                                         .map_err(|e| io::Error::other(format!("Failed to create ListUsers message: {e:?}")))?;
                                     self.send_message_chunked(message).await
                                         .map_err(|e| io::Error::other(format!("Failed to send ListUsers message: {e:?}")))?;
-                                    self.display_prompt()?;
                                 }
                                 Ok(user_input) => {
                                     if let Err(e) = self.handle_user_input(user_input).await {
                                         logger::log_error(&format!("Error: {e:?}"));
-                                        self.display_prompt()?;
                                     }
                                 }
                                 Err(e) => {
                                     logger::log_error(&format!("Input error: {e:?}"));
-                                    self.display_prompt()?;
                                 }
                             }
                         }
