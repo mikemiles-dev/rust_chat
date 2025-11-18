@@ -16,10 +16,13 @@ A modern, colorful terminal-based chat application written in Rust with async/aw
 - 🛡️ **Smart Username Handling** - Automatic renaming for duplicate usernames
 - 🔁 **Auto-Reconnect** - Exponential backoff reconnection when server goes down
 - 🔒 **Security Hardened** - Rate limiting, input validation, connection limits, and memory safety
+- 🔐 **TLS/HTTPS Support** - Production-ready encryption via Caddy reverse proxy
 - 📊 **Rich Logging** - Categorized logs (INFO, ERROR, WARN, OK, SYSTEM, CHAT)
 - 📝 **Command History** - Full readline support with persistent command history (up to 1000 commands)
 - ⌨️ **Tab Completion** - Smart autocomplete for commands and usernames
 - 💡 **Inline Hints** - Visual hints showing available completions as you type
+- 🚀 **Production Ready** - Docker and native systemd deployment options
+- 👮 **Admin Commands** - Server-side `/kick` and user management
 
 ## Architecture
 
@@ -242,13 +245,23 @@ rust_chat/
 │           ├── error.rs     # Error types and Display impl
 │           ├── handlers.rs  # Message processing logic
 │           └── rate_limiting.rs # Token bucket rate limiter
-└── chat_shared/
-    └── src/
-        ├── lib.rs           # Module exports
-        ├── input.rs         # Shared UserInput trait
-        ├── logger.rs        # Colorized logging utilities
-        ├── message.rs       # Message protocol
-        └── network.rs       # TCP message handling
+├── chat_shared/
+│   └── src/
+│       ├── lib.rs           # Module exports
+│       ├── input.rs         # Shared UserInput trait
+│       ├── logger.rs        # Colorized logging utilities
+│       ├── message.rs       # Message protocol
+│       └── network.rs       # TCP message handling
+├── deploy/
+│   ├── install.sh           # Automated native deployment script
+│   ├── rust-chat.service    # systemd service file
+│   ├── Caddyfile.native     # Caddy config for native deployment
+│   └── NATIVE_DEPLOYMENT.md # Complete native deployment guide
+├── Dockerfile               # Multi-stage Docker build
+├── docker-compose.yml       # Docker orchestration with Caddy
+├── Caddyfile               # Caddy config for Docker deployment
+├── .dockerignore           # Docker build optimization
+└── DEPLOYMENT.md           # Docker deployment guide
 ```
 
 ## Features in Detail
@@ -450,7 +463,11 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 ## Production Deployment
 
-### Deploying to Digital Ocean (or any VPS)
+You have two deployment options:
+
+### Option 1: Docker Deployment (Easiest)
+
+**Best for**: Quick setup, containerized environments
 
 1. **Set up your droplet**:
    - Create a droplet with Docker pre-installed
@@ -478,6 +495,46 @@ cargo clippy --all-targets --all-features -- -D warnings
    # Check certificate status
    docker exec caddy_proxy caddy list-certificates
    ```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed Docker deployment guide.
+
+### Option 2: Native Deployment (Best Performance)
+
+**Best for**: Maximum performance, simpler stack, single server
+
+**Quick Install on Ubuntu:**
+
+```bash
+# Clone repository
+git clone <your-repo>
+cd rust_chat
+
+# Run installation script
+sudo ./deploy/install.sh
+
+# Configure Caddy (edit with your domain and email)
+sudo nano /etc/caddy/Caddyfile
+
+# Start services
+sudo systemctl enable rust-chat
+sudo systemctl start rust-chat
+sudo systemctl restart caddy
+
+# View logs
+sudo journalctl -u rust-chat -f
+```
+
+See [deploy/NATIVE_DEPLOYMENT.md](deploy/NATIVE_DEPLOYMENT.md) for complete guide.
+
+**Comparison:**
+
+| Feature | Docker | Native |
+|---------|--------|--------|
+| Setup | Easier | Medium |
+| Performance | Good | Better |
+| Memory | ~200MB | ~50MB |
+| Updates | Rebuild image | Rebuild binary |
+| Isolation | High | Medium |
 
 ### Architecture
 
