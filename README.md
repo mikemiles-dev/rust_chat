@@ -257,12 +257,16 @@ rust_chat/
 │   ├── rust-chat.service    # systemd service file
 │   ├── Caddyfile.native     # Caddy config for native deployment
 │   └── NATIVE_DEPLOYMENT.md # Complete native deployment guide
-└── docker/
-    ├── Dockerfile           # Multi-stage Docker build
-    ├── docker-compose.yml   # Docker orchestration with Caddy
-    ├── Caddyfile           # Caddy config for Docker deployment
-    ├── .dockerignore       # Docker build optimization
-    └── DEPLOYMENT.md       # Docker deployment guide
+├── docker/
+│   ├── Dockerfile           # Multi-stage Docker build
+│   ├── docker-compose.yml   # Docker orchestration with Caddy
+│   ├── Caddyfile           # Caddy config for Docker deployment
+│   ├── .dockerignore       # Docker build optimization
+│   └── DEPLOYMENT.md       # Docker deployment guide
+└── digital_ocean/
+    ├── setup-caddy.sh       # One-time Caddy installation & config
+    ├── start-server.sh      # Start server in tmux session
+    └── README.md           # Complete Digital Ocean tmux guide
 ```
 
 ## Features in Detail
@@ -464,7 +468,30 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 ## Production Deployment
 
-You have two deployment options:
+You have three deployment options:
+
+### Option 0: Digital Ocean with tmux (Interactive + HTTPS)
+
+**Best for**: Need server commands AND encryption, simplest deployment
+
+**Quick Deploy:**
+
+```bash
+# On your Digital Ocean droplet
+git clone <your-repo>
+cd rust_chat/digital_ocean
+
+# One-time Caddy setup
+sudo ./setup-caddy.sh
+
+# Start server
+./start-server.sh
+
+# Attach to use /kick, /list, etc.
+tmux attach -t chat
+```
+
+See [digital_ocean/README.md](digital_ocean/README.md) for complete guide.
 
 ### Option 1: Docker Deployment (Easiest)
 
@@ -529,13 +556,15 @@ See [deploy/NATIVE_DEPLOYMENT.md](deploy/NATIVE_DEPLOYMENT.md) for complete guid
 
 **Comparison:**
 
-| Feature | Docker | Native |
-|---------|--------|--------|
-| Setup | Easier | Medium |
-| Performance | Good | Better |
-| Memory | ~200MB | ~50MB |
-| Updates | Rebuild image | Rebuild binary |
-| Isolation | High | Medium |
+| Feature | Digital Ocean + tmux | Docker | Native systemd |
+|---------|---------------------|--------|----------------|
+| Setup | Easiest | Easy | Medium |
+| Interactive Commands | ✅ Yes | ❌ No | ❌ No |
+| HTTPS/TLS | ✅ Auto | ✅ Auto | ✅ Auto |
+| Performance | Excellent | Good | Excellent |
+| Memory | ~50MB | ~200MB | ~50MB |
+| Auto-restart | Manual | ✅ Yes | ✅ Yes |
+| Best for | Quick start + control | Multi-server | Production daemon |
 
 ### Architecture
 

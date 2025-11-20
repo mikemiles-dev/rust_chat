@@ -1,5 +1,4 @@
 use crate::completer::ClientCompleter;
-use colored::Colorize;
 use rustyline::config::Configurer;
 use rustyline::Editor;
 use std::collections::HashSet;
@@ -20,11 +19,8 @@ pub fn spawn_readline_handler(
         rl.set_auto_add_history(true);
         rl.set_max_history_size(1000).ok();
 
-        // Simple colored prompt
-        let formatted_prompt = format!("{} ", ">".bright_cyan());
-
         loop {
-            match rl.readline(&formatted_prompt) {
+            match rl.readline("") {
                 Ok(line) => {
                     if tx.send(Some(line)).is_err() {
                         break; // Receiver dropped
