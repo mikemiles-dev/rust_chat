@@ -43,7 +43,7 @@ fi
 cd "$PROJECT_DIR"
 
 echo "Building server in release mode..."
-cargo build --release --bin chat_server
+cargo build --release --bin server
 
 if [ $? -ne 0 ]; then
     echo "Error: Build failed"
@@ -60,7 +60,7 @@ echo "  Session: $TMUX_SESSION"
 echo ""
 
 # Create tmux session and run server
-tmux new-session -d -s $TMUX_SESSION "CHAT_SERVER_ADDR=$SERVER_ADDR CHAT_SERVER_MAX_CLIENTS=$MAX_CLIENTS ./target/release/chat_server"
+tmux new-session -d -s $TMUX_SESSION "CHAT_SERVER_ADDR=$SERVER_ADDR CHAT_SERVER_MAX_CLIENTS=$MAX_CLIENTS ./target/release/server"
 
 echo "✓ Server started in tmux session '$TMUX_SESSION'"
 echo ""

@@ -5,27 +5,27 @@ WORKDIR /usr/src/app
 
 # Copy manifests
 COPY Cargo.toml Cargo.lock ./
-COPY chat_client/Cargo.toml ./chat_client/
-COPY chat_server/Cargo.toml ./chat_server/
+COPY client/Cargo.toml ./client/
+COPY server/Cargo.toml ./server/
 COPY chat_shared/Cargo.toml ./chat_shared/
 
 # Create dummy source files to cache dependencies
-RUN mkdir -p chat_client/src chat_server/src chat_shared/src && \
-    echo "fn main() {}" > chat_server/src/main.rs && \
-    echo "fn main() {}" > chat_client/src/main.rs && \
+RUN mkdir -p client/src server/src chat_shared/src && \
+    echo "fn main() {}" > server/src/main.rs && \
+    echo "fn main() {}" > client/src/main.rs && \
     echo "pub fn dummy() {}" > chat_shared/src/lib.rs
 
 # Build dependencies (this layer will be cached)
-RUN cargo build --release --bin chat_server
+RUN cargo build --release --bin server
 
 # Remove dummy files
-RUN rm -rf chat_client/src chat_server/src chat_shared/src
+RUN rm -rf client/src server/src chat_shared/src
 
 # Copy actual source code
 COPY . .
 
 # Build the actual application
-RUN cargo build --release --bin chat_server
+RUN cargo build --release --bin server
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -41,7 +41,7 @@ RUN useradd -m -u 1000 chatuser
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /usr/src/app/target/release/chat_server /app/
+COPY --from=builder /usr/src/app/target/release/server /app/
 
 # Change ownership
 RUN chown -R chatuser:chatuser /app
@@ -55,4 +55,4 @@ EXPOSE 8080
 ENV CHAT_SERVER_ADDR="0.0.0.0:8080"
 ENV CHAT_SERVER_MAX_CLIENTS="100"
 
-ENTRYPOINT ["/app/chat_server"]
+ENTRYPOINT ["/app/server"]

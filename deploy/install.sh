@@ -65,13 +65,13 @@ if [ ! -d "$(pwd)/Cargo.toml" ]; then
     exit 1
 fi
 
-cargo build --release --bin chat_server
+cargo build --release --bin server
 
 echo ""
 echo "Step 7: Installing binary..."
-cp target/release/chat_server $INSTALL_DIR/
-chown $USER:$USER $INSTALL_DIR/chat_server
-chmod +x $INSTALL_DIR/chat_server
+cp target/release/server $INSTALL_DIR/
+chown $USER:$USER $INSTALL_DIR/server
+chmod +x $INSTALL_DIR/server
 
 echo ""
 echo "Step 8: Installing systemd service..."

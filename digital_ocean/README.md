@@ -389,7 +389,7 @@ sudo netstat -an | grep :443 | grep ESTABLISHED | wc -l
 htop
 
 # Just the chat server
-ps aux | grep chat_server
+ps aux | grep server
 
 # Memory usage
 free -h
@@ -470,7 +470,7 @@ Downsize/upsize as needed (requires droplet restart).
 ### From Client App
 
 ```bash
-cargo run --bin chat_client
+cargo run --bin client
 # Enter server: chat.yourdomain.com:443
 # Enter username: YourName
 ```
@@ -479,9 +479,9 @@ cargo run --bin chat_client
 
 ```bash
 # On your local machine
-cargo build --release --bin chat_client
+cargo build --release --bin client
 
-# Binary is at: target/release/chat_client
+# Binary is at: target/release/client
 # Share this with users
 ```
 

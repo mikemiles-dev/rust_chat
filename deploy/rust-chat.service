@@ -9,7 +9,7 @@ Group=rustchat
 WorkingDirectory=/opt/rust_chat
 Environment="CHAT_SERVER_ADDR=127.0.0.1:8080"
 Environment="CHAT_SERVER_MAX_CLIENTS=100"
-ExecStart=/opt/rust_chat/chat_server
+ExecStart=/opt/rust_chat/server
 Restart=always
 RestartSec=5
 

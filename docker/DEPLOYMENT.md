@@ -78,7 +78,7 @@ docker exec caddy_proxy caddy list-certificates
 
 From your local machine:
 ```bash
-cargo run --bin chat_client
+cargo run --bin client
 # Enter: chat.yourdomain.com:443
 ```
 

@@ -1,5 +1,5 @@
 [package]
-name = "chat_server"
+name = "client"
 description.workspace = true
 edition.workspace = true
 version.workspace = true
@@ -8,6 +8,7 @@ readme.workspace = true
 
 [dependencies]
 chat_shared.workspace = true
+chrono.workspace = true
+colored.workspace = true
 tokio.workspace = true
-rand.workspace = true
 rustyline.workspace = true

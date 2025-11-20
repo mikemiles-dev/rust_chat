@@ -26,7 +26,7 @@ When hosting a chat server publicly, you need multiple layers of protection agai
 Add IP tracking and blocking in the Rust server:
 
 ```rust
-// In chat_server/src/main.rs
+// In server/src/main.rs
 use std::collections::HashSet;
 
 pub struct ChatServer {

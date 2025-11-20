@@ -28,8 +28,8 @@ A modern, colorful terminal-based chat application written in Rust with async/aw
 
 The project is organized into three crates:
 
-- **chat_client** - Terminal client application
-- **chat_server** - Multi-threaded chat server
+- **client** - Terminal client application
+- **server** - Multi-threaded chat server
 - **chat_shared** - Shared code (message protocol, networking, logging)
 
 ## Requirements
@@ -44,7 +44,7 @@ The project is organized into three crates:
 #### Starting the Server
 
 ```bash
-cargo run --bin chat_server
+cargo run --bin server
 ```
 
 The server will start on `0.0.0.0:8080` by default.
@@ -63,16 +63,16 @@ Configure the server using environment variables:
 
 ```bash
 # Custom address and port
-CHAT_SERVER_ADDR="127.0.0.1:9000" cargo run --bin chat_server
+CHAT_SERVER_ADDR="127.0.0.1:9000" cargo run --bin server
 
 # Custom max clients
-CHAT_SERVER_MAX_CLIENTS="50" cargo run --bin chat_server
+CHAT_SERVER_MAX_CLIENTS="50" cargo run --bin server
 ```
 
 #### Starting the Client
 
 ```bash
-cargo run --bin chat_client
+cargo run --bin client
 ```
 
 You'll be prompted to enter:
@@ -83,13 +83,13 @@ Alternatively, you can use environment variables to skip the prompts:
 
 ```bash
 # Set both server and username
-CHAT_SERVER="127.0.0.1:8080" CHAT_USERNAME="Alice" cargo run --bin chat_client
+CHAT_SERVER="127.0.0.1:8080" CHAT_USERNAME="Alice" cargo run --bin client
 
 # Set only server (will prompt for username)
-CHAT_SERVER="chat.example.com:443" cargo run --bin chat_client
+CHAT_SERVER="chat.example.com:443" cargo run --bin client
 
 # Set only username (will prompt for server)
-CHAT_USERNAME="Bob" cargo run --bin chat_client
+CHAT_USERNAME="Bob" cargo run --bin client
 ```
 
 ### Production Deployment
@@ -204,14 +204,14 @@ Alice /r Perfect! Let's discuss the project.
 
 ```
 rust_chat/
-├── chat_client/
+├── client/
 │   └── src/
 │       ├── main.rs          # Entry point and setup
 │       ├── client.rs        # Client logic and message handling
 │       ├── input.rs         # Client command processing
 │       ├── completer.rs     # Tab completion for commands & usernames
 │       └── readline_helper.rs # Rustyline integration with async
-├── chat_server/
+├── server/
 │   └── src/
 │       ├── main.rs          # Server entry point and command handling
 │       ├── input.rs         # Server command processing

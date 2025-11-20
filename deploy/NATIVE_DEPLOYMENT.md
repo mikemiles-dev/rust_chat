@@ -142,10 +142,10 @@ cd ~/rust_chat
 git pull
 
 # Rebuild
-cargo build --release --bin chat_server
+cargo build --release --bin server
 
 # Copy new binary
-sudo cp target/release/chat_server /opt/rust_chat/
+sudo cp target/release/server /opt/rust_chat/
 
 # Restart service
 sudo systemctl restart rust-chat
@@ -229,10 +229,10 @@ sudo systemctl reload caddy
 sudo journalctl -u rust-chat -n 50
 
 # Check if binary exists
-ls -la /opt/rust_chat/chat_server
+ls -la /opt/rust_chat/server
 
 # Try running manually
-sudo -u rustchat /opt/rust_chat/chat_server
+sudo -u rustchat /opt/rust_chat/server
 
 # Check permissions
 ls -la /opt/rust_chat/
@@ -273,7 +273,7 @@ sudo ufw allow 443/tcp
 sudo chown -R rustchat:rustchat /opt/rust_chat
 
 # Make binary executable
-sudo chmod +x /opt/rust_chat/chat_server
+sudo chmod +x /opt/rust_chat/server
 ```
 
 ## Firewall Configuration
@@ -345,10 +345,10 @@ Reboot or restart the service.
 
 ```bash
 # CPU and memory
-ps aux | grep chat_server
+ps aux | grep server
 
 # Real-time monitoring
-top -p $(pgrep chat_server)
+top -p $(pgrep server)
 
 # Detailed info
 sudo systemctl show rust-chat
@@ -373,7 +373,7 @@ sudo ss -tn | grep :8080
 mkdir -p ~/backups
 
 # Backup binary
-sudo cp /opt/rust_chat/chat_server ~/backups/chat_server.backup
+sudo cp /opt/rust_chat/server ~/backups/server.backup
 
 # Backup service file
 sudo cp /etc/systemd/system/rust-chat.service ~/backups/

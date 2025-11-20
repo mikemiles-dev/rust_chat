@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "chat_server", "chat_client", "chat_shared"]
+members = [ "server", "client", "chat_shared"]
 
 [workspace.package]
 description = "Rust Chat Application using Tokio over TCP"
