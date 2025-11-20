@@ -18,6 +18,7 @@ target/
 docs/
 
 # Docker files (don't need in build context)
+docker/
 Dockerfile
 docker-compose.yml
 .dockerignore
@@ -37,8 +38,8 @@ Thumbs.db
 # Test files
 **/tests/
 
-# Caddy files
-Caddyfile
+# Deployment files
+deploy/
 caddy_data/
 caddy_config/
 

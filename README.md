@@ -257,11 +257,12 @@ rust_chat/
 │   ├── rust-chat.service    # systemd service file
 │   ├── Caddyfile.native     # Caddy config for native deployment
 │   └── NATIVE_DEPLOYMENT.md # Complete native deployment guide
-├── Dockerfile               # Multi-stage Docker build
-├── docker-compose.yml       # Docker orchestration with Caddy
-├── Caddyfile               # Caddy config for Docker deployment
-├── .dockerignore           # Docker build optimization
-└── DEPLOYMENT.md           # Docker deployment guide
+└── docker/
+    ├── Dockerfile           # Multi-stage Docker build
+    ├── docker-compose.yml   # Docker orchestration with Caddy
+    ├── Caddyfile           # Caddy config for Docker deployment
+    ├── .dockerignore       # Docker build optimization
+    └── DEPLOYMENT.md       # Docker deployment guide
 ```
 
 ## Features in Detail
@@ -476,7 +477,7 @@ You have two deployment options:
 2. **Clone and configure**:
    ```bash
    git clone <your-repo>
-   cd rust_chat
+   cd rust_chat/docker
 
    # Edit Caddyfile with your domain and email
    nano Caddyfile
@@ -496,7 +497,7 @@ You have two deployment options:
    docker exec caddy_proxy caddy list-certificates
    ```
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed Docker deployment guide.
+See [docker/DEPLOYMENT.md](docker/DEPLOYMENT.md) for detailed Docker deployment guide.
 
 ### Option 2: Native Deployment (Best Performance)
 

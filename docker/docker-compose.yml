@@ -4,8 +4,8 @@ services:
   # Rust Chat Server
   chat_server:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: rust_chat_server
     restart: unless-stopped
     environment:

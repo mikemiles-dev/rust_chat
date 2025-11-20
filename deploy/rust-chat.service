@@ -1,0 +1,29 @@
+[Unit]
+Description=Rust Chat Server
+After=network.target
+
+[Service]
+Type=simple
+User=rustchat
+Group=rustchat
+WorkingDirectory=/opt/rust_chat
+Environment="CHAT_SERVER_ADDR=127.0.0.1:8080"
+Environment="CHAT_SERVER_MAX_CLIENTS=100"
+ExecStart=/opt/rust_chat/chat_server
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/rust_chat
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rust-chat
+
+[Install]
+WantedBy=multi-user.target
