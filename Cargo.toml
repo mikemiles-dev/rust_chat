@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "server", "client", "chat_shared"]
+members = [ "server", "client", "shared"]
 
 [workspace.package]
 description = "Rust Chat Application using Tokio over TCP"
@@ -10,7 +10,7 @@ authors = ["michael.mileusnich@gmail.com"]
 readme = "README.md"
 
 [workspace.dependencies]
-chat_shared = { path = "chat_shared" }
+shared = { path = "shared" }
 chrono = "0.4"
 colored = "2.1"
 tokio = { version = "1", features = ["full"] }

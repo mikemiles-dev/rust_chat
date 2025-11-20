@@ -1,6 +1,6 @@
 use std::io;
 use std::net::SocketAddr;
-use chat_shared::message::ChatMessage;
+use shared::message::ChatMessage;
 use tokio::sync::broadcast;
 
 #[derive(Debug)]

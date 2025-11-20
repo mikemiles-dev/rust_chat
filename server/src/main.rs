@@ -1,5 +1,5 @@
-use chat_shared::logger;
-use chat_shared::message::ChatMessage;
+use shared::logger;
+use shared::message::ChatMessage;
 use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};

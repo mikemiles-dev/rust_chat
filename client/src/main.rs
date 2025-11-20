@@ -3,7 +3,7 @@ mod completer;
 mod input;
 mod readline_helper;
 
-use chat_shared::logger;
+use shared::logger;
 use client::ChatClient;
 use std::env;
 use std::io::{self, Write};

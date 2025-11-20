@@ -1,6 +1,6 @@
-use chat_shared::logger;
-use chat_shared::message::{ChatMessage, MessageTypes};
-use chat_shared::network::TcpMessageHandler;
+use shared::logger;
+use shared::message::{ChatMessage, MessageTypes};
+use shared::network::TcpMessageHandler;
 use rand::Rng;
 use std::collections::HashSet;
 use std::net::SocketAddr;

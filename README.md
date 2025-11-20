@@ -30,7 +30,7 @@ The project is organized into three crates:
 
 - **client** - Terminal client application
 - **server** - Multi-threaded chat server
-- **chat_shared** - Shared code (message protocol, networking, logging)
+- **shared** - Shared code (message protocol, networking, logging)
 
 ## Requirements
 
@@ -222,7 +222,7 @@ rust_chat/
 │           ├── error.rs     # Error types and Display impl
 │           ├── handlers.rs  # Message processing logic
 │           └── rate_limiting.rs # Token bucket rate limiter
-├── chat_shared/
+├── shared/
 │   └── src/
 │       ├── lib.rs           # Module exports
 │       ├── input.rs         # Shared UserInput trait

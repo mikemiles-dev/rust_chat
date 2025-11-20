@@ -7,19 +7,19 @@ WORKDIR /usr/src/app
 COPY Cargo.toml Cargo.lock ./
 COPY client/Cargo.toml ./client/
 COPY server/Cargo.toml ./server/
-COPY chat_shared/Cargo.toml ./chat_shared/
+COPY shared/Cargo.toml ./shared/
 
 # Create dummy source files to cache dependencies
-RUN mkdir -p client/src server/src chat_shared/src && \
+RUN mkdir -p client/src server/src shared/src && \
     echo "fn main() {}" > server/src/main.rs && \
     echo "fn main() {}" > client/src/main.rs && \
-    echo "pub fn dummy() {}" > chat_shared/src/lib.rs
+    echo "pub fn dummy() {}" > shared/src/lib.rs
 
 # Build dependencies (this layer will be cached)
 RUN cargo build --release --bin server
 
 # Remove dummy files
-RUN rm -rf client/src server/src chat_shared/src
+RUN rm -rf client/src server/src shared/src
 
 # Copy actual source code
 COPY . .

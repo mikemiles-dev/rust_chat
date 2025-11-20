@@ -1,8 +1,8 @@
 use crate::input::{self, ClientUserInput};
 use crate::readline_helper;
-use chat_shared::logger;
-use chat_shared::message::{ChatMessage, ChatMessageError, MessageTypes};
-use chat_shared::network::TcpMessageHandler;
+use shared::logger;
+use shared::message::{ChatMessage, ChatMessageError, MessageTypes};
+use shared::network::TcpMessageHandler;
 use std::collections::HashSet;
 use std::io;
 use std::net::{AddrParseError, SocketAddr};
@@ -285,8 +285,8 @@ impl ChatClient {
                         Ok(message) => {
                             self.handle_message(message).await;
                         }
-                        Err(chat_shared::network::TcpMessageHandlerError::IoError(_)) |
-                        Err(chat_shared::network::TcpMessageHandlerError::Disconnect) => {
+                        Err(shared::network::TcpMessageHandlerError::IoError(_)) |
+                        Err(shared::network::TcpMessageHandlerError::Disconnect) => {
                             logger::log_warning("Disconnected from server");
 
                             // Don't reconnect if we were kicked

@@ -7,9 +7,9 @@ use handlers::MessageHandlers;
 use rate_limiting::{RateLimiter, RATE_LIMIT_MESSAGES, RATE_LIMIT_WINDOW};
 
 use crate::ServerCommand;
-use chat_shared::logger;
-use chat_shared::message::{ChatMessage, MessageTypes};
-use chat_shared::network::{TcpMessageHandler, TcpMessageHandlerError};
+use shared::logger;
+use shared::message::{ChatMessage, MessageTypes};
+use shared::network::{TcpMessageHandler, TcpMessageHandlerError};
 use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::sync::Arc;

@@ -1,4 +1,4 @@
-use chat_shared::input::{UserInput, UserInputError};
+use shared::input::{UserInput, UserInputError};
 
 #[derive(Debug)]
 pub enum ServerUserInput {
