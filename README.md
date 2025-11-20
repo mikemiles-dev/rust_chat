@@ -79,6 +79,19 @@ You'll be prompted to enter:
 1. **Server address** (default: `127.0.0.1:8080`)
 2. **Username** (default: `Guest`)
 
+Alternatively, you can use environment variables to skip the prompts:
+
+```bash
+# Set both server and username
+CHAT_SERVER="127.0.0.1:8080" CHAT_USERNAME="Alice" cargo run --bin chat_client
+
+# Set only server (will prompt for username)
+CHAT_SERVER="chat.example.com:443" cargo run --bin chat_client
+
+# Set only username (will prompt for server)
+CHAT_USERNAME="Bob" cargo run --bin chat_client
+```
+
 ### Production Deployment
 
 For production deployment with HTTPS/TLS encryption, see:
