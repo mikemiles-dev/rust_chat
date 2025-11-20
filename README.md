@@ -39,61 +39,7 @@ The project is organized into three crates:
 
 ## Quick Start
 
-### Option 1: Docker Deployment (Recommended for Production)
-
-The easiest way to deploy with automatic HTTPS/TLS encryption:
-
-#### Prerequisites
-- Docker and Docker Compose installed
-- A domain name pointing to your server (for automatic HTTPS)
-
-#### Setup
-
-1. **Configure your domain** in `Caddyfile`:
-   ```bash
-   # Edit Caddyfile and replace:
-   # - your-email@example.com (for Let's Encrypt notifications)
-   # - chat.yourdomain.com (with your actual domain)
-   ```
-
-2. **Start the services**:
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **View logs**:
-   ```bash
-   docker-compose logs -f
-   ```
-
-4. **Stop the services**:
-   ```bash
-   docker-compose down
-   ```
-
-That's it! Caddy automatically:
-- Obtains Let's Encrypt TLS certificates
-- Renews certificates before expiry
-- Redirects HTTP to HTTPS
-- Handles TLS termination
-
-#### Connect to your server
-
-```bash
-# Client connects via TLS (port 443)
-cargo run --bin chat_client
-# Enter: chat.yourdomain.com:443
-```
-
-#### Local Development (without domain)
-
-For testing locally without a domain:
-```bash
-docker-compose up -d
-# Connect to localhost:8443 (no TLS verification needed for dev)
-```
-
-### Option 2: Local Development (No Docker)
+### Local Development
 
 #### Starting the Server
 
@@ -102,6 +48,14 @@ cargo run --bin chat_server
 ```
 
 The server will start on `0.0.0.0:8080` by default.
+
+You can use server commands:
+```
+/help       # Show available commands
+/list       # List connected users
+/kick USER  # Kick a user
+/quit       # Shutdown server
+```
 
 #### Server Configuration
 
@@ -124,6 +78,16 @@ cargo run --bin chat_client
 You'll be prompted to enter:
 1. **Server address** (default: `127.0.0.1:8080`)
 2. **Username** (default: `Guest`)
+
+### Production Deployment
+
+For production deployment with HTTPS/TLS encryption, see:
+
+- **[digital_ocean/](digital_ocean/)** - Deploy on Digital Ocean with tmux + Caddy (simplest, interactive)
+- **[docker/](docker/)** - Docker deployment with automatic HTTPS
+- **[deploy/](deploy/)** - Native systemd deployment on Ubuntu
+
+Each folder contains complete setup scripts and documentation.
 
 ## Usage
 
@@ -468,139 +432,34 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 ## Production Deployment
 
-You have three deployment options:
+For production deployment with HTTPS/TLS encryption, choose the option that best fits your needs:
 
-### Option 0: Digital Ocean with tmux (Interactive + HTTPS)
+### Deployment Options
 
-**Best for**: Need server commands AND encryption, simplest deployment
+| Option | Best For | Interactive Commands | Auto-Restart | Complexity |
+|--------|----------|---------------------|--------------|------------|
+| **[digital_ocean/](digital_ocean/)** | Quick start + server control | ✅ Yes | Manual | Easiest |
+| **[docker/](docker/)** | Containerized deployment | ❌ No | ✅ Yes | Easy |
+| **[deploy/](deploy/)** | Maximum performance | ❌ No | ✅ Yes | Medium |
 
-**Quick Deploy:**
+### Quick Links
 
-```bash
-# On your Digital Ocean droplet
-git clone <your-repo>
-cd rust_chat/digital_ocean
+- **Digital Ocean (tmux + Caddy)** - [digital_ocean/README.md](digital_ocean/README.md)
+  - Two scripts: setup and start
+  - Use `/kick`, `/list`, etc. in tmux
+  - Automatic HTTPS via Caddy
 
-# One-time Caddy setup
-sudo ./setup-caddy.sh
+- **Docker Deployment** - [docker/DEPLOYMENT.md](docker/DEPLOYMENT.md)
+  - `docker-compose up -d`
+  - Automatic HTTPS via Caddy
+  - Isolated containers
 
-# Start server
-./start-server.sh
+- **Native systemd** - [deploy/NATIVE_DEPLOYMENT.md](deploy/NATIVE_DEPLOYMENT.md)
+  - systemd service with Caddy
+  - Best performance (~50MB memory)
+  - Full system integration
 
-# Attach to use /kick, /list, etc.
-tmux attach -t chat
-```
-
-See [digital_ocean/README.md](digital_ocean/README.md) for complete guide.
-
-### Option 1: Docker Deployment (Easiest)
-
-**Best for**: Quick setup, containerized environments
-
-1. **Set up your droplet**:
-   - Create a droplet with Docker pre-installed
-   - Point your domain's A record to the droplet's IP
-
-2. **Clone and configure**:
-   ```bash
-   git clone <your-repo>
-   cd rust_chat/docker
-
-   # Edit Caddyfile with your domain and email
-   nano Caddyfile
-   ```
-
-3. **Deploy**:
-   ```bash
-   docker-compose up -d
-   ```
-
-4. **Monitor**:
-   ```bash
-   # View logs
-   docker-compose logs -f
-
-   # Check certificate status
-   docker exec caddy_proxy caddy list-certificates
-   ```
-
-See [docker/DEPLOYMENT.md](docker/DEPLOYMENT.md) for detailed Docker deployment guide.
-
-### Option 2: Native Deployment (Best Performance)
-
-**Best for**: Maximum performance, simpler stack, single server
-
-**Quick Install on Ubuntu:**
-
-```bash
-# Clone repository
-git clone <your-repo>
-cd rust_chat
-
-# Run installation script
-sudo ./deploy/install.sh
-
-# Configure Caddy (edit with your domain and email)
-sudo nano /etc/caddy/Caddyfile
-
-# Start services
-sudo systemctl enable rust-chat
-sudo systemctl start rust-chat
-sudo systemctl restart caddy
-
-# View logs
-sudo journalctl -u rust-chat -f
-```
-
-See [deploy/NATIVE_DEPLOYMENT.md](deploy/NATIVE_DEPLOYMENT.md) for complete guide.
-
-**Comparison:**
-
-| Feature | Digital Ocean + tmux | Docker | Native systemd |
-|---------|---------------------|--------|----------------|
-| Setup | Easiest | Easy | Medium |
-| Interactive Commands | ✅ Yes | ❌ No | ❌ No |
-| HTTPS/TLS | ✅ Auto | ✅ Auto | ✅ Auto |
-| Performance | Excellent | Good | Excellent |
-| Memory | ~50MB | ~200MB | ~50MB |
-| Auto-restart | Manual | ✅ Yes | ✅ Yes |
-| Best for | Quick start + control | Multi-server | Production daemon |
-
-### Architecture
-
-```
-Internet (Port 443/80)
-         ↓
-    Caddy (TLS Termination)
-    - Auto Let's Encrypt
-    - Certificate renewal
-    - HTTP → HTTPS redirect
-         ↓
-  Chat Server (Port 8080)
-  - Plain TCP internally
-  - Isolated network
-```
-
-### Security Notes
-
-- **TLS/HTTPS**: Caddy automatically obtains and renews Let's Encrypt certificates
-- **Network Isolation**: Chat server only accessible via Caddy reverse proxy
-- **Non-root User**: Application runs as unprivileged user in container
-- **Certificate Persistence**: Certificates stored in Docker volume (survives restarts)
-- **Firewall**: Only ports 80 and 443 need to be open
-
-### Updating
-
-```bash
-# Pull latest changes
-git pull
-
-# Rebuild and restart
-docker-compose up -d --build
-
-# Remove old images
-docker image prune -f
-```
+All options include automatic HTTPS/TLS via Caddy with Let's Encrypt.
 
 ## Dependencies
 
