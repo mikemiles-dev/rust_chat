@@ -71,6 +71,25 @@ CHAT_SERVER_MAX_CLIENTS="50" cargo run --bin server
 
 #### Starting the Client
 
+**Option 1: Connect to Live Demo Server**
+
+Try out the chat by connecting to the live instance:
+
+```bash
+cargo run --bin client
+# When prompted:
+# Server: tls://chat.rustmiles.chat:8443
+# Username: YourName
+```
+
+Or use environment variables:
+
+```bash
+CHAT_SERVER="tls://chat.rustmiles.chat:8443" CHAT_USERNAME="YourName" cargo run --bin client
+```
+
+**Option 2: Local Development**
+
 ```bash
 cargo run --bin client
 ```
