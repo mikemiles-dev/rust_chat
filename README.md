@@ -45,13 +45,13 @@ Connect to the live server instantly with Docker:
 
 ```bash
 # Interactive mode (will prompt for username)
-docker run -it --rm ghcr.io/michaelmileusnich/rust_chat-client:latest
+docker run -it --rm ghcr.io/mikemiles-dev/rust_chat-client:latest
 
 # Or specify everything upfront
 docker run -it --rm \
   -e CHAT_SERVER=tls://chat.rustmiles.chat:8443 \
   -e CHAT_USERNAME=YourName \
-  ghcr.io/michaelmileusnich/rust_chat-client:latest
+  ghcr.io/mikemiles-dev/rust_chat-client:latest
 ```
 
 No installation required! Docker will automatically pull the latest client image.
