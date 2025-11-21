@@ -14,16 +14,27 @@ SERVER_ADDR="0.0.0.0:8443"
 MAX_CLIENTS="100"
 PROJECT_DIR="$HOME/rust_chat"
 
-# TLS Certificate Paths
-# Update these to match your domain name
-TLS_CERT_PATH="/etc/letsencrypt/live/chat.yourdomain.com/fullchain.pem"
-TLS_KEY_PATH="/etc/letsencrypt/live/chat.yourdomain.com/privkey.pem"
-
 # ============================================
 # Start Server
 # ============================================
 
 echo "=== Rust Chat Server Startup ==="
+echo ""
+
+# Prompt for domain name if not set via environment variable
+if [ -z "$CHAT_DOMAIN" ]; then
+    read -p "Enter your domain name (e.g., milesrust.chat): " CHAT_DOMAIN
+    if [ -z "$CHAT_DOMAIN" ]; then
+        echo "Error: Domain name is required for TLS"
+        exit 1
+    fi
+fi
+
+# TLS Certificate Paths (based on domain)
+TLS_CERT_PATH="/etc/letsencrypt/live/$CHAT_DOMAIN/fullchain.pem"
+TLS_KEY_PATH="/etc/letsencrypt/live/$CHAT_DOMAIN/privkey.pem"
+
+echo "Using domain: $CHAT_DOMAIN"
 echo ""
 
 # Check if project directory exists
@@ -70,17 +81,15 @@ if [ -f "$TLS_CERT_PATH" ] && [ -f "$TLS_KEY_PATH" ]; then
     echo "  Cert: $TLS_CERT_PATH"
     echo "  Key: $TLS_KEY_PATH"
     TLS_ENV="TLS_CERT_PATH=$TLS_CERT_PATH TLS_KEY_PATH=$TLS_KEY_PATH"
-    CLIENT_CONNECT="tls://your-domain:8443"
+    CLIENT_CONNECT="tls://$CHAT_DOMAIN:8443"
 else
     echo "  TLS: ✗ DISABLED (certificates not found)"
     echo ""
     echo "  WARNING: Server will run WITHOUT encryption!"
-    echo "  To enable TLS:"
-    echo "    1. Run: sudo ./setup-certificates.sh"
-    echo "    2. Update certificate paths in this script"
+    echo "  To enable TLS, run: sudo certbot certonly --standalone -d $CHAT_DOMAIN"
     echo ""
     TLS_ENV=""
-    CLIENT_CONNECT="your-domain:8080"
+    CLIENT_CONNECT="$CHAT_DOMAIN:8443"
 fi
 
 echo ""
