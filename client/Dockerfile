@@ -3,10 +3,11 @@ FROM rust:1.75-slim as builder
 
 WORKDIR /build
 
-# Copy workspace files
+# Copy entire workspace (needed for Cargo workspace)
 COPY Cargo.toml Cargo.lock ./
 COPY shared ./shared
 COPY client ./client
+COPY server ./server
 
 # Build the client in release mode
 RUN cargo build --release --bin client
