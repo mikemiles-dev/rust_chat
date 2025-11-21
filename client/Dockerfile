@@ -1,8 +1,10 @@
-# Build stage - use Alpine for musl libc compatibility
-FROM rust:1.91-alpine AS builder
+# Build stage
+FROM rust:1.91-slim AS builder
 
-# Install build dependencies for native code (ring, aws-lc-sys)
-RUN apk add --no-cache musl-dev cmake make gcc g++ perl linux-headers
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
@@ -15,11 +17,13 @@ COPY server ./server
 # Build the client in release mode
 RUN cargo build --release --bin client
 
-# Runtime stage - Alpine is much smaller than Debian
-FROM alpine:latest
+# Runtime stage - debian-slim for glibc compatibility and proper CA certs
+FROM debian:trixie-slim
 
 # Install ca-certificates for TLS
-RUN apk --no-cache add ca-certificates
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy the binary from builder
 COPY --from=builder /build/target/release/client /usr/local/bin/rust-chat-client
