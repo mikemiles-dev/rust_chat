@@ -113,13 +113,11 @@ CHAT_USERNAME="Bob" cargo run --bin client
 
 ### Production Deployment
 
-For production deployment with TLS encryption, see:
+For production deployment with TLS encryption:
 
-- **[deploy/digital_ocean/](deploy/digital_ocean/)** - Deploy on Digital Ocean with tmux + native TLS (simplest, interactive)
-- **[deploy/docker/](deploy/docker/)** - Docker deployment with native TLS
-- **[deploy/native/](deploy/native/)** - Native systemd deployment on Ubuntu
+- **[deploy/digital_ocean/](deploy/digital_ocean/)** - Deploy on Digital Ocean with tmux + native TLS
 
-Each folder contains complete setup scripts and documentation.
+Complete setup scripts and documentation included.
 
 ## Usage
 
@@ -249,16 +247,6 @@ rust_chat/
 │       ├── message.rs       # Message protocol
 │       └── network.rs       # TCP message handling
 └── deploy/
-    ├── native/
-    │   ├── install.sh           # Automated native deployment script
-    │   ├── rust-chat.service    # systemd service file
-    │   ├── Caddyfile.native     # Caddy config for native deployment
-    │   └── NATIVE_DEPLOYMENT.md # Complete native deployment guide
-    ├── docker/
-    │   ├── Dockerfile           # Multi-stage Docker build
-    │   ├── docker-compose.yml   # Docker orchestration
-    │   ├── .dockerignore       # Docker build optimization
-    │   └── DEPLOYMENT.md       # Docker deployment guide
     └── digital_ocean/
         ├── setup-certificates.sh # Get Let's Encrypt TLS certificates
         ├── start-server.sh      # Start server in tmux with TLS
@@ -465,36 +453,22 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 ## Production Deployment
 
-For production deployment with TLS encryption, choose the option that best fits your needs:
+Deploy to Digital Ocean with native TLS encryption:
 
-### Deployment Options
+**[deploy/digital_ocean/](deploy/digital_ocean/)** - Complete deployment guide
 
-| Option | Best For | Interactive Commands | Auto-Restart | TLS Method | Complexity |
-|--------|----------|---------------------|--------------|------------|------------|
-| **[deploy/digital_ocean/](deploy/digital_ocean/)** | Quick start + server control | ✅ Yes | Manual | Native TLS | Easiest |
-| **[deploy/docker/](deploy/docker/)** | Containerized deployment | ❌ No | ✅ Yes | Native TLS | Easy |
-| **[deploy/native/](deploy/native/)** | Maximum performance | ❌ No | ✅ Yes | Native TLS | Medium |
+### Features
 
-### Quick Links
+- ✅ Interactive setup script for Let's Encrypt certificates
+- ✅ Native TLS encryption (no reverse proxy needed)
+- ✅ Server management via tmux
+- ✅ Interactive server commands (`/kick`, `/list`, etc.)
+- ✅ Auto-renewal for certificates
+- ✅ Runs on port 8443
 
-- **Digital Ocean (tmux)** - [deploy/digital_ocean/README.md](deploy/digital_ocean/README.md)
-  - Interactive setup script for certificates
-  - Use `/kick`, `/list`, etc. in tmux
-  - Native TLS with Let's Encrypt
-  - Port 8443
+### Quick Start
 
-- **Docker Deployment** - [deploy/docker/DEPLOYMENT.md](deploy/docker/DEPLOYMENT.md)
-  - `docker-compose up -d`
-  - Mount Let's Encrypt certificates
-  - Isolated containers
-  - Port 8443
-
-- **Native systemd** - [deploy/native/NATIVE_DEPLOYMENT.md](deploy/native/NATIVE_DEPLOYMENT.md)
-  - systemd service
-  - Best performance (~50MB memory)
-  - Full system integration
-
-All options use native TLS encryption built into the Rust server with Let's Encrypt certificates.
+See **[deploy/digital_ocean/QUICK_START.md](deploy/digital_ocean/QUICK_START.md)** for rapid deployment or **[deploy/digital_ocean/README.md](deploy/digital_ocean/README.md)** for complete documentation.
 
 ## Dependencies
 
@@ -514,8 +488,8 @@ All options use native TLS encryption built into the Rust server with Let's Encr
 - **webpki-roots** - Mozilla's root certificates for TLS validation
 
 ### Deployment
-- **Docker** - Container runtime (optional)
 - **Certbot** - Let's Encrypt certificate management
+- **tmux** - Terminal multiplexer for server management
 
 ## Contributing
 
