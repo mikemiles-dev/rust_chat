@@ -1,3 +1,4 @@
+use shared::commands::client as commands;
 use shared::input::{UserInput, UserInputError};
 
 #[derive(Debug)]
@@ -31,64 +32,59 @@ impl TryFrom<&str> for ClientUserInput {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let trimmed = value.trim();
         let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        let cmd = parts.first().copied().unwrap_or("");
 
-        match parts.first().copied().unwrap_or("") {
-            "/quit" => Ok(ClientUserInput::Quit),
-            "/list" => Ok(ClientUserInput::ListUsers),
-            "/help" => Ok(ClientUserInput::Help),
-            "/dm" => {
-                if parts.len() < 3 {
-                    Err(UserInputError::InvalidCommand)
-                } else {
-                    let recipient = parts[1].to_string();
-                    let message = parts[2..].join(" ");
-                    Ok(ClientUserInput::DirectMessage { recipient, message })
-                }
+        if commands::QUIT.matches(cmd) {
+            Ok(ClientUserInput::Quit)
+        } else if commands::LIST.matches(cmd) {
+            Ok(ClientUserInput::ListUsers)
+        } else if commands::HELP.matches(cmd) {
+            Ok(ClientUserInput::Help)
+        } else if commands::DM.matches(cmd) {
+            if parts.len() < 3 {
+                Err(UserInputError::InvalidCommand)
+            } else {
+                let recipient = parts[1].to_string();
+                let message = parts[2..].join(" ");
+                Ok(ClientUserInput::DirectMessage { recipient, message })
             }
-            "/r" => {
-                if parts.len() < 2 {
-                    Err(UserInputError::InvalidCommand)
-                } else {
-                    let message = parts[1..].join(" ");
-                    Ok(ClientUserInput::Reply(message))
-                }
+        } else if commands::REPLY.matches(cmd) {
+            if parts.len() < 2 {
+                Err(UserInputError::InvalidCommand)
+            } else {
+                let message = parts[1..].join(" ");
+                Ok(ClientUserInput::Reply(message))
             }
-            "/rename" => {
-                if parts.len() < 2 {
-                    Err(UserInputError::InvalidCommand)
-                } else {
-                    let new_name = parts[1].to_string();
-                    Ok(ClientUserInput::Rename(new_name))
-                }
+        } else if commands::RENAME.matches(cmd) {
+            if parts.len() < 2 {
+                Err(UserInputError::InvalidCommand)
+            } else {
+                let new_name = parts[1].to_string();
+                Ok(ClientUserInput::Rename(new_name))
             }
-            "/send" => {
-                if parts.len() < 3 {
-                    Err(UserInputError::InvalidCommand)
-                } else {
-                    let recipient = parts[1].to_string();
-                    let file_path = parts[2..].join(" ");
-                    Ok(ClientUserInput::SendFile {
-                        recipient,
-                        file_path,
-                    })
-                }
+        } else if commands::SEND.matches(cmd) {
+            if parts.len() < 3 {
+                Err(UserInputError::InvalidCommand)
+            } else {
+                let recipient = parts[1].to_string();
+                let file_path = parts[2..].join(" ");
+                Ok(ClientUserInput::SendFile {
+                    recipient,
+                    file_path,
+                })
             }
-            "/status" => {
-                if parts.len() < 2 {
-                    // No status provided - clear status
-                    Ok(ClientUserInput::Status(None))
-                } else {
-                    let status = parts[1..].join(" ");
-                    Ok(ClientUserInput::Status(Some(status)))
-                }
+        } else if commands::STATUS.matches(cmd) {
+            if parts.len() < 2 {
+                // No status provided - clear status
+                Ok(ClientUserInput::Status(None))
+            } else {
+                let status = parts[1..].join(" ");
+                Ok(ClientUserInput::Status(Some(status)))
             }
-            _ => {
-                if trimmed.starts_with('/') {
-                    Err(UserInputError::InvalidCommand)
-                } else {
-                    Ok(ClientUserInput::Message(trimmed.to_string()))
-                }
-            }
+        } else if trimmed.starts_with('/') {
+            Err(UserInputError::InvalidCommand)
+        } else {
+            Ok(ClientUserInput::Message(trimmed.to_string()))
         }
     }
 }

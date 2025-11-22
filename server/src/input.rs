@@ -1,3 +1,4 @@
+use shared::commands::server as commands;
 use shared::input::{UserInput, UserInputError};
 
 use std::net::IpAddr;
@@ -26,56 +27,57 @@ impl TryFrom<&str> for ServerUserInput {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let trimmed = value.trim();
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        let cmd = parts.first().copied().unwrap_or("");
 
-        match trimmed {
-            "/quit" | "/q" => Ok(ServerUserInput::Quit),
-            "/list" => Ok(ServerUserInput::ListUsers),
-            "/help" | "/h" => Ok(ServerUserInput::Help),
-            _ => {
-                if let Some(username) = trimmed.strip_prefix("/kick ") {
-                    let username = username.trim();
-                    if username.is_empty() {
-                        Err(UserInputError::InvalidCommand)
-                    } else {
-                        Ok(ServerUserInput::Kick(username.to_string()))
-                    }
-                } else if let Some(args) = trimmed.strip_prefix("/rename ") {
-                    let parts: Vec<&str> = args.split_whitespace().collect();
-                    if parts.len() != 2 {
-                        Err(UserInputError::InvalidCommand)
-                    } else {
-                        Ok(ServerUserInput::Rename {
-                            old_name: parts[0].to_string(),
-                            new_name: parts[1].to_string(),
-                        })
-                    }
-                } else if let Some(target) = trimmed.strip_prefix("/ban ") {
-                    let target = target.trim();
-                    if target.is_empty() {
-                        Err(UserInputError::InvalidCommand)
-                    } else if let Ok(ip) = target.parse::<IpAddr>() {
-                        // It's an IP address
-                        Ok(ServerUserInput::BanIp(ip))
-                    } else {
-                        // It's a username
-                        Ok(ServerUserInput::Ban(target.to_string()))
-                    }
-                } else if let Some(ip_str) = trimmed.strip_prefix("/unban ") {
-                    let ip_str = ip_str.trim();
-                    if let Ok(ip) = ip_str.parse::<IpAddr>() {
-                        Ok(ServerUserInput::Unban(ip))
-                    } else {
-                        Err(UserInputError::InvalidCommand)
-                    }
-                } else if trimmed == "/banlist" {
-                    Ok(ServerUserInput::BanList)
-                } else if trimmed.starts_with('/') {
-                    Err(UserInputError::InvalidCommand)
-                } else {
-                    // Ignore non-command input on server
-                    Err(UserInputError::InvalidCommand)
-                }
+        if commands::QUIT.matches(cmd) {
+            Ok(ServerUserInput::Quit)
+        } else if commands::LIST.matches(cmd) {
+            Ok(ServerUserInput::ListUsers)
+        } else if commands::HELP.matches(cmd) {
+            Ok(ServerUserInput::Help)
+        } else if commands::KICK.matches(cmd) {
+            let username = parts.get(1..).map(|p| p.join(" ")).unwrap_or_default();
+            let username = username.trim();
+            if username.is_empty() {
+                Err(UserInputError::InvalidCommand)
+            } else {
+                Ok(ServerUserInput::Kick(username.to_string()))
             }
+        } else if commands::RENAME.matches(cmd) {
+            if parts.len() != 3 {
+                Err(UserInputError::InvalidCommand)
+            } else {
+                Ok(ServerUserInput::Rename {
+                    old_name: parts[1].to_string(),
+                    new_name: parts[2].to_string(),
+                })
+            }
+        } else if commands::BAN.matches(cmd) {
+            let target = parts.get(1).map(|s| s.trim()).unwrap_or("");
+            if target.is_empty() {
+                Err(UserInputError::InvalidCommand)
+            } else if let Ok(ip) = target.parse::<IpAddr>() {
+                // It's an IP address
+                Ok(ServerUserInput::BanIp(ip))
+            } else {
+                // It's a username
+                Ok(ServerUserInput::Ban(target.to_string()))
+            }
+        } else if commands::UNBAN.matches(cmd) {
+            let ip_str = parts.get(1).map(|s| s.trim()).unwrap_or("");
+            if let Ok(ip) = ip_str.parse::<IpAddr>() {
+                Ok(ServerUserInput::Unban(ip))
+            } else {
+                Err(UserInputError::InvalidCommand)
+            }
+        } else if commands::BANLIST.matches(cmd) {
+            Ok(ServerUserInput::BanList)
+        } else if trimmed.starts_with('/') {
+            Err(UserInputError::InvalidCommand)
+        } else {
+            // Ignore non-command input on server
+            Err(UserInputError::InvalidCommand)
         }
     }
 }

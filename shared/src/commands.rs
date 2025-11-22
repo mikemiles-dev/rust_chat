@@ -48,6 +48,11 @@ impl Command {
         names
     }
 
+    /// Check if the given string matches this command's name or alias
+    pub fn matches(&self, cmd: &str) -> bool {
+        cmd == self.name || self.alias.map_or(false, |a| cmd == a)
+    }
+
     /// Format command for help display
     pub fn help_line(&self) -> String {
         let mut line = self.name.to_string();
@@ -130,9 +135,13 @@ pub mod client {
 pub mod server {
     use super::Command;
 
-    pub const HELP: Command = Command::new("/help").with_description("Show this help message");
+    pub const HELP: Command = Command::new("/help")
+        .with_alias("/h")
+        .with_description("Show this help message");
 
-    pub const QUIT: Command = Command::new("/quit").with_description("Shutdown the server");
+    pub const QUIT: Command = Command::new("/quit")
+        .with_alias("/q")
+        .with_description("Shutdown the server");
 
     pub const LIST: Command = Command::new("/list").with_description("List all connected users");
 
@@ -159,10 +168,7 @@ pub mod server {
 
     /// Get all command names for completion (includes aliases)
     pub fn completion_names() -> Vec<&'static str> {
-        // Include aliases for completion
-        let mut names: Vec<&'static str> = ALL.iter().flat_map(|cmd| cmd.all_names()).collect();
-        names.extend_from_slice(&["/h", "/q"]); // aliases
-        names
+        ALL.iter().flat_map(|cmd| cmd.all_names()).collect()
     }
 
     /// Generate help text for all commands

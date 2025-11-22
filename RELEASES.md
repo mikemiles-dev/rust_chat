@@ -1,3 +1,6 @@
+# 0.1.7
+ * Refactored command parsing to use shared command constants, eliminating duplication between command definitions and input parsing.
+
 # 0.1.6
  * Better client reconnection.
 
