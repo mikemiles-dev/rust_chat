@@ -8,7 +8,7 @@ use client::ChatClient;
 use std::env;
 use std::io::{self, Write};
 
-const DEFAULT_SERVER: &str = "127.0.0.1:8080";
+const DEFAULT_SERVER: &str = "tls://milesrust.chat:8443";
 const DEFAULT_NAME: &str = "Guest";
 
 #[tokio::main]
