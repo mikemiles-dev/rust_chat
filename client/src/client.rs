@@ -99,6 +99,7 @@ pub struct ChatClient {
     last_dm_sender: Option<String>,
     connected_users: Arc<RwLock<HashSet<String>>>,
     was_kicked: bool,
+    current_status: Option<String>,
 }
 
 impl ChatClient {
@@ -151,6 +152,7 @@ impl ChatClient {
             last_dm_sender: None,
             connected_users: Arc::new(RwLock::new(HashSet::new())),
             was_kicked: false,
+            current_status: None,
         })
     }
 
@@ -233,6 +235,16 @@ impl ChatClient {
                     if let Err(e) = self.join_server().await {
                         logger::log_error(&format!("Failed to rejoin server: {:?}", e));
                         return Err(e);
+                    }
+
+                    // Restore user's status if they had one set
+                    if let Some(status) = &self.current_status {
+                        let content = Some(status.clone().into_bytes());
+                        if let Ok(status_msg) = ChatMessage::try_new(MessageTypes::SetStatus, content) {
+                            if let Err(e) = self.send_message_chunked(status_msg).await {
+                                logger::log_warning(&format!("Failed to restore status: {:?}", e));
+                            }
+                        }
                     }
 
                     return Ok(());
@@ -536,6 +548,8 @@ impl ChatClient {
                 file_path,
             } => self.send_file(&recipient, &file_path).await,
             input::ClientUserInput::Status(status) => {
+                // Store status locally so we can restore it after reconnection
+                self.current_status = status.clone();
                 let content = status.map(|s| s.into_bytes());
                 let message = ChatMessage::try_new(MessageTypes::SetStatus, content)?;
                 self.send_message_chunked(message).await?;
