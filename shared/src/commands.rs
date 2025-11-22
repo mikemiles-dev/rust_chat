@@ -66,14 +66,12 @@ impl Command {
 pub mod client {
     use super::Command;
 
-    pub const HELP: Command = Command::new("/help")
-        .with_description("Show this help message");
+    pub const HELP: Command = Command::new("/help").with_description("Show this help message");
 
-    pub const QUIT: Command = Command::new("/quit")
-        .with_description("Exit the chat");
+    pub const QUIT: Command = Command::new("/quit").with_description("Exit the chat");
 
-    pub const LIST: Command = Command::new("/list")
-        .with_description("List all users (with statuses)");
+    pub const LIST: Command =
+        Command::new("/list").with_description("List all users (with statuses)");
 
     pub const DM: Command = Command::new("/dm")
         .with_usage("<username> <message>")
@@ -95,14 +93,23 @@ pub mod client {
         .with_usage("<message>")
         .with_description("Set your status (visible in /list)");
 
-    pub const STATUS_CLEAR: Command = Command::new("/status")
-        .with_description("Clear your status");
+    pub const STATUS_CLEAR: Command = Command::new("/status").with_description("Clear your status");
 
     /// All client commands (for completion - excludes STATUS_CLEAR as it's same command)
     pub const ALL: &[Command] = &[HELP, LIST, DM, REPLY, SEND, RENAME, STATUS, QUIT];
 
     /// All help entries (includes STATUS_CLEAR for documentation)
-    pub const HELP_ENTRIES: &[Command] = &[HELP, LIST, DM, REPLY, SEND, RENAME, STATUS, STATUS_CLEAR, QUIT];
+    pub const HELP_ENTRIES: &[Command] = &[
+        HELP,
+        LIST,
+        DM,
+        REPLY,
+        SEND,
+        RENAME,
+        STATUS,
+        STATUS_CLEAR,
+        QUIT,
+    ];
 
     /// Get all command names for completion (includes aliases)
     pub fn completion_names() -> Vec<&'static str> {
@@ -123,14 +130,11 @@ pub mod client {
 pub mod server {
     use super::Command;
 
-    pub const HELP: Command = Command::new("/help")
-        .with_description("Show this help message");
+    pub const HELP: Command = Command::new("/help").with_description("Show this help message");
 
-    pub const QUIT: Command = Command::new("/quit")
-        .with_description("Shutdown the server");
+    pub const QUIT: Command = Command::new("/quit").with_description("Shutdown the server");
 
-    pub const LIST: Command = Command::new("/list")
-        .with_description("List all connected users");
+    pub const LIST: Command = Command::new("/list").with_description("List all connected users");
 
     pub const KICK: Command = Command::new("/kick")
         .with_usage("<user>")
@@ -148,8 +152,7 @@ pub mod server {
         .with_usage("<ip>")
         .with_description("Unban an IP address");
 
-    pub const BANLIST: Command = Command::new("/banlist")
-        .with_description("List all banned IPs");
+    pub const BANLIST: Command = Command::new("/banlist").with_description("List all banned IPs");
 
     /// All server commands
     pub const ALL: &[Command] = &[LIST, KICK, RENAME, BAN, UNBAN, BANLIST, HELP, QUIT];

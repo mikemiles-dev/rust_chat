@@ -8,11 +8,11 @@ pub enum MessageTypes {
     DirectMessage,
     Error,
     RenameRequest,
-    FileTransfer,      // File data being sent: recipient|sender|filename|data
-    FileTransferAck,   // Acknowledgment that file was received
-    SetStatus,         // Set user's status message
-    Ping,              // Server heartbeat to check if client is alive
-    Pong,              // Client response to Ping
+    FileTransfer,    // File data being sent: recipient|sender|filename|data
+    FileTransferAck, // Acknowledgment that file was received
+    SetStatus,       // Set user's status message
+    Ping,            // Server heartbeat to check if client is alive
+    Pong,            // Client response to Ping
     Unknown(u8),
 }
 
@@ -192,10 +192,9 @@ mod tests {
     #[test]
     fn test_message_roundtrip() {
         let original_content = b"Hello, World!".to_vec();
-        let original_msg = ChatMessage::try_new(
-            MessageTypes::DirectMessage,
-            Some(original_content.clone())
-        ).unwrap();
+        let original_msg =
+            ChatMessage::try_new(MessageTypes::DirectMessage, Some(original_content.clone()))
+                .unwrap();
 
         let serialized: Vec<u8> = original_msg.into();
         let deserialized = ChatMessage::from(serialized);
@@ -233,10 +232,8 @@ mod tests {
 
     #[test]
     fn test_content_as_string_valid_utf8() {
-        let msg = ChatMessage::try_new(
-            MessageTypes::ChatMessage,
-            Some(b"Valid UTF-8".to_vec())
-        ).unwrap();
+        let msg =
+            ChatMessage::try_new(MessageTypes::ChatMessage, Some(b"Valid UTF-8".to_vec())).unwrap();
         assert_eq!(msg.content_as_string(), Some("Valid UTF-8".to_string()));
     }
 
@@ -244,8 +241,9 @@ mod tests {
     fn test_content_as_string_invalid_utf8() {
         let msg = ChatMessage::try_new(
             MessageTypes::ChatMessage,
-            Some(vec![0xFF, 0xFE, 0xFD]) // Invalid UTF-8
-        ).unwrap();
+            Some(vec![0xFF, 0xFE, 0xFD]), // Invalid UTF-8
+        )
+        .unwrap();
         assert_eq!(msg.content_as_string(), None);
     }
 }

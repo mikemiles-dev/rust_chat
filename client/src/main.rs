@@ -3,8 +3,8 @@ mod completer;
 mod input;
 mod readline_helper;
 
-use shared::logger;
 use client::ChatClient;
+use shared::logger;
 use std::env;
 use std::io::{self, Write};
 
@@ -24,13 +24,16 @@ fn restore_terminal() {
 async fn main() -> io::Result<()> {
     let (chat_server, chat_name) = get_server_info()?;
 
-    let mut client = ChatClient::new(&chat_server, chat_name).await
+    let mut client = ChatClient::new(&chat_server, chat_name)
+        .await
         .map_err(|e| {
             logger::log_error(&format!("Failed to create client: {:?}", e));
             io::Error::other(format!("Failed to create client: {e:?}"))
         })?;
 
-    client.join_server().await
+    client
+        .join_server()
+        .await
         .map_err(|e| io::Error::other(format!("Failed to join server: {e:?}")))?;
 
     // Run client with Ctrl+C handling
@@ -68,7 +71,7 @@ fn get_server_info() -> io::Result<(String, String)> {
             logger::log_info(&format!("Using server from CHAT_SERVER: {}", val));
             val
         }
-        _ => prompt_input("Enter Chat Server", DEFAULT_SERVER)?
+        _ => prompt_input("Enter Chat Server", DEFAULT_SERVER)?,
     };
 
     let name = match env::var("CHAT_USERNAME") {
@@ -76,7 +79,7 @@ fn get_server_info() -> io::Result<(String, String)> {
             logger::log_info(&format!("Using username from CHAT_USERNAME: {}", val));
             val
         }
-        _ => prompt_input("Enter Chat Name", DEFAULT_NAME)?
+        _ => prompt_input("Enter Chat Name", DEFAULT_NAME)?,
     };
 
     Ok((server, name))

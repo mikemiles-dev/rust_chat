@@ -1,3 +1,5 @@
+use rustls::ServerConfig;
+use rustls_pemfile::{certs, private_key};
 use shared::commands::server as commands;
 use shared::logger;
 use shared::message::ChatMessage;
@@ -6,13 +8,11 @@ use std::fs::File;
 use std::io::BufReader;
 use std::net::{IpAddr, SocketAddr};
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{env, io};
 use tokio::net::TcpListener;
 use tokio::sync::{RwLock, broadcast};
-use rustls::ServerConfig;
-use rustls_pemfile::{certs, private_key};
 use tokio_rustls::TlsAcceptor;
 
 mod completer;
@@ -46,7 +46,11 @@ pub struct ChatServer {
 }
 
 impl ChatServer {
-    async fn new(bind_addr: &str, max_clients: usize, tls_acceptor: Option<TlsAcceptor>) -> io::Result<Self> {
+    async fn new(
+        bind_addr: &str,
+        max_clients: usize,
+        tls_acceptor: Option<TlsAcceptor>,
+    ) -> io::Result<Self> {
         let (tx, _rx) = broadcast::channel(max_clients * 16); // Allow message buffering
         let (cmd_tx, _cmd_rx) = broadcast::channel(100); // Server commands channel
         let listener = TcpListener::bind(bind_addr).await?;
@@ -227,7 +231,11 @@ impl ChatServer {
         if clients.contains(&username) {
             drop(clients);
             // Send kick command to all connections - the matching one will disconnect
-            if self.server_commands.send(ServerCommand::Kick(username.clone())).is_ok() {
+            if self
+                .server_commands
+                .send(ServerCommand::Kick(username.clone()))
+                .is_ok()
+            {
                 logger::log_warning(&format!("Kicking user: {}", username));
             }
         } else {
@@ -255,7 +263,10 @@ impl ChatServer {
             logger::log_error("Invalid username length (1-32 characters)");
             return;
         }
-        if !new_name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+        if !new_name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
             logger::log_error("Invalid characters (only alphanumeric, underscore, hyphen allowed)");
             return;
         }
@@ -266,10 +277,14 @@ impl ChatServer {
         drop(clients);
 
         // Send rename command to all connections - the matching one will handle it
-        if self.server_commands.send(ServerCommand::Rename {
-            old_name: old_name.clone(),
-            new_name: new_name.clone(),
-        }).is_ok() {
+        if self
+            .server_commands
+            .send(ServerCommand::Rename {
+                old_name: old_name.clone(),
+                new_name: new_name.clone(),
+            })
+            .is_ok()
+        {
             logger::log_success(&format!("Renaming user '{}' to '{}'", old_name, new_name));
         }
     }
@@ -345,26 +360,49 @@ impl ChatServer {
 }
 
 fn load_tls_config(cert_path: &str, key_path: &str) -> io::Result<ServerConfig> {
-    let cert_file = File::open(cert_path)
-        .map_err(|e| io::Error::new(io::ErrorKind::NotFound, format!("Certificate file not found: {}", e)))?;
-    let key_file = File::open(key_path)
-        .map_err(|e| io::Error::new(io::ErrorKind::NotFound, format!("Key file not found: {}", e)))?;
+    let cert_file = File::open(cert_path).map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("Certificate file not found: {}", e),
+        )
+    })?;
+    let key_file = File::open(key_path).map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("Key file not found: {}", e),
+        )
+    })?;
 
     let mut cert_reader = BufReader::new(cert_file);
     let mut key_reader = BufReader::new(key_file);
 
     let certs = certs(&mut cert_reader)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Invalid certificate: {}", e)))?;
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Invalid certificate: {}", e),
+            )
+        })?;
 
     let key = private_key(&mut key_reader)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Invalid private key: {}", e)))?
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Invalid private key: {}", e),
+            )
+        })?
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "No private key found"))?;
 
     let config = ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(certs, key)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("TLS config error: {}", e)))?;
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("TLS config error: {}", e),
+            )
+        })?;
 
     Ok(config)
 }
@@ -383,8 +421,13 @@ async fn main() -> io::Result<()> {
         .unwrap_or(100);
 
     // Check if TLS is configured
-    let tls_acceptor = match (env::var(TLS_CERT_PATH_ENV_VAR), env::var(TLS_KEY_PATH_ENV_VAR)) {
-        (Ok(cert_path), Ok(key_path)) if Path::new(&cert_path).exists() && Path::new(&key_path).exists() => {
+    let tls_acceptor = match (
+        env::var(TLS_CERT_PATH_ENV_VAR),
+        env::var(TLS_KEY_PATH_ENV_VAR),
+    ) {
+        (Ok(cert_path), Ok(key_path))
+            if Path::new(&cert_path).exists() && Path::new(&key_path).exists() =>
+        {
             logger::log_info("TLS enabled - loading certificates...");
             match load_tls_config(&cert_path, &key_path) {
                 Ok(config) => {
@@ -400,7 +443,10 @@ async fn main() -> io::Result<()> {
         }
         _ => {
             logger::log_info("TLS not configured - running without encryption");
-            logger::log_info(&format!("To enable TLS, set {} and {} environment variables", TLS_CERT_PATH_ENV_VAR, TLS_KEY_PATH_ENV_VAR));
+            logger::log_info(&format!(
+                "To enable TLS, set {} and {} environment variables",
+                TLS_CERT_PATH_ENV_VAR, TLS_KEY_PATH_ENV_VAR
+            ));
             None
         }
     };

@@ -8,10 +8,10 @@ pub enum ServerUserInput {
     ListUsers,
     Kick(String),
     Rename { old_name: String, new_name: String },
-    Ban(String),      // Ban by username (will resolve to IP)
-    BanIp(IpAddr),    // Ban by IP directly
-    Unban(IpAddr),    // Unban by IP
-    BanList,          // List all banned IPs
+    Ban(String),   // Ban by username (will resolve to IP)
+    BanIp(IpAddr), // Ban by IP directly
+    Unban(IpAddr), // Unban by IP
+    BanList,       // List all banned IPs
     Quit,
 }
 

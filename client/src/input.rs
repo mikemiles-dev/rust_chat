@@ -5,10 +5,16 @@ pub enum ClientUserInput {
     Help,
     ListUsers,
     Message(String),
-    DirectMessage { recipient: String, message: String },
+    DirectMessage {
+        recipient: String,
+        message: String,
+    },
     Reply(String),
     Rename(String),
-    SendFile { recipient: String, file_path: String },
+    SendFile {
+        recipient: String,
+        file_path: String,
+    },
     Status(Option<String>),
     Quit,
 }
@@ -61,7 +67,10 @@ impl TryFrom<&str> for ClientUserInput {
                 } else {
                     let recipient = parts[1].to_string();
                     let file_path = parts[2..].join(" ");
-                    Ok(ClientUserInput::SendFile { recipient, file_path })
+                    Ok(ClientUserInput::SendFile {
+                        recipient,
+                        file_path,
+                    })
                 }
             }
             "/status" => {

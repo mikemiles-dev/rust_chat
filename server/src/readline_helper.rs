@@ -1,6 +1,6 @@
 use crate::completer::ServerCompleter;
-use rustyline::config::Configurer;
 use rustyline::Editor;
+use rustyline::config::Configurer;
 use tokio::sync::mpsc;
 
 /// Runs rustyline in a blocking thread and sends input via channel

@@ -1,7 +1,7 @@
+use rand::Rng;
 use shared::logger;
 use shared::message::{ChatMessage, MessageTypes};
 use shared::network::TcpMessageHandler;
-use rand::Rng;
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
@@ -52,9 +52,7 @@ impl<'a> MessageHandlers<'a> {
     ) -> Result<(), UserConnectionError> {
         let mut tcp_handler = StreamWrapper { stream };
         // Rate limiting check (except for Join messages)
-        if !matches!(message.msg_type, MessageTypes::Join)
-            && !rate_limiter.check_and_consume()
-        {
+        if !matches!(message.msg_type, MessageTypes::Join) && !rate_limiter.check_and_consume() {
             logger::log_warning(&format!("Rate limit exceeded for {}", self.addr));
             let error_msg = ChatMessage::try_new(
                 MessageTypes::Error,
@@ -81,12 +79,20 @@ impl<'a> MessageHandlers<'a> {
                 self.process_list_users(&mut tcp_handler).await?;
             }
             MessageTypes::DirectMessage => {
-                self.process_direct_message(message.content_as_string(), &mut tcp_handler, chat_name)
-                    .await?;
+                self.process_direct_message(
+                    message.content_as_string(),
+                    &mut tcp_handler,
+                    chat_name,
+                )
+                .await?;
             }
             MessageTypes::RenameRequest => {
-                self.process_rename_request(message.content_as_string(), &mut tcp_handler, chat_name)
-                    .await?;
+                self.process_rename_request(
+                    message.content_as_string(),
+                    &mut tcp_handler,
+                    chat_name,
+                )
+                .await?;
             }
             MessageTypes::FileTransfer => {
                 self.process_file_transfer(message.get_content(), &mut tcp_handler, chat_name)
@@ -353,7 +359,9 @@ impl<'a> MessageHandlers<'a> {
             ));
             let error_msg = ChatMessage::try_new(
                 MessageTypes::Error,
-                Some(b"Invalid characters (only alphanumeric, underscore, hyphen allowed)".to_vec()),
+                Some(
+                    b"Invalid characters (only alphanumeric, underscore, hyphen allowed)".to_vec(),
+                ),
             )
             .map_err(|_| UserConnectionError::InvalidMessage)?;
             tcp_handler
@@ -502,7 +510,10 @@ impl<'a> MessageHandlers<'a> {
 
         logger::log_system(&format!(
             "[FILE] {} -> {} ('{}', {} bytes)",
-            sender, recipient, filename, file_data.len()
+            sender,
+            recipient,
+            filename,
+            file_data.len()
         ));
 
         // Build outgoing message with sender instead of recipient
@@ -521,9 +532,8 @@ impl<'a> MessageHandlers<'a> {
         final_content.extend_from_slice(recipient.as_bytes());
         final_content.extend_from_slice(&outgoing_content);
 
-        let file_message =
-            ChatMessage::try_new(MessageTypes::FileTransfer, Some(final_content))
-                .map_err(|_| UserConnectionError::InvalidMessage)?;
+        let file_message = ChatMessage::try_new(MessageTypes::FileTransfer, Some(final_content))
+            .map_err(|_| UserConnectionError::InvalidMessage)?;
 
         // Broadcast to all clients (recipient will filter)
         self.tx
@@ -557,7 +567,9 @@ impl<'a> MessageHandlers<'a> {
         if status_text.len() > MAX_STATUS_LENGTH {
             let error_msg = ChatMessage::try_new(
                 MessageTypes::Error,
-                Some(format!("Status too long (max {} characters)", MAX_STATUS_LENGTH).into_bytes()),
+                Some(
+                    format!("Status too long (max {} characters)", MAX_STATUS_LENGTH).into_bytes(),
+                ),
             )
             .map_err(|_| UserConnectionError::InvalidMessage)?;
             tcp_handler
@@ -584,8 +596,9 @@ impl<'a> MessageHandlers<'a> {
         } else {
             format!("Status set to: {}", status_text)
         };
-        let response = ChatMessage::try_new(MessageTypes::SetStatus, Some(confirm_msg.into_bytes()))
-            .map_err(|_| UserConnectionError::InvalidMessage)?;
+        let response =
+            ChatMessage::try_new(MessageTypes::SetStatus, Some(confirm_msg.into_bytes()))
+                .map_err(|_| UserConnectionError::InvalidMessage)?;
         tcp_handler
             .send_message_chunked(response)
             .await
@@ -603,41 +616,57 @@ mod tests {
     fn test_username_validation_valid() {
         // Valid usernames
         assert_eq!("alice".len(), 5);
-        assert!("alice"
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+        assert!(
+            "alice"
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        );
 
         assert_eq!("Bob123".len(), 6);
-        assert!("Bob123"
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+        assert!(
+            "Bob123"
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        );
 
         assert_eq!("user_name".len(), 9);
-        assert!("user_name"
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+        assert!(
+            "user_name"
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        );
 
         assert_eq!("user-name".len(), 9);
-        assert!("user-name"
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+        assert!(
+            "user-name"
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        );
     }
 
     #[test]
     fn test_username_validation_invalid_chars() {
         // Invalid characters
-        assert!(!"user@name"
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
-        assert!(!"user name"
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
-        assert!(!"user!name"
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
-        assert!(!"user.name"
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-'));
+        assert!(
+            !"user@name"
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        );
+        assert!(
+            !"user name"
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        );
+        assert!(
+            !"user!name"
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        );
+        assert!(
+            !"user.name"
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        );
     }
 
     #[test]

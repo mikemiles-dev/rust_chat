@@ -4,7 +4,7 @@ mod rate_limiting;
 
 pub use error::UserConnectionError;
 use handlers::MessageHandlers;
-use rate_limiting::{RateLimiter, RATE_LIMIT_MESSAGES, RATE_LIMIT_WINDOW};
+use rate_limiting::{RATE_LIMIT_MESSAGES, RATE_LIMIT_WINDOW, RateLimiter};
 
 use crate::ServerCommand;
 use shared::logger;
@@ -145,6 +145,8 @@ impl UserConnection {
         let mut last_activity = Instant::now();
         let mut ping_interval = tokio::time::interval(PING_INTERVAL);
         ping_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        // Skip the first immediate tick - we don't want to ping right away
+        ping_interval.tick().await;
 
         loop {
             tokio::select! {

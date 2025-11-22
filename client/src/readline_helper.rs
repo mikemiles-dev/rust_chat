@@ -1,6 +1,6 @@
 use crate::completer::ClientCompleter;
-use rustyline::config::Configurer;
 use rustyline::Editor;
+use rustyline::config::Configurer;
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;

@@ -1,9 +1,11 @@
 use crate::input::{self, ClientUserInput};
 use crate::readline_helper;
+use rustls::ClientConfig;
+use rustls::pki_types::ServerName;
 use shared::commands::client as commands;
 use shared::logger;
 use shared::message::{ChatMessage, ChatMessageError, MessageTypes};
-use shared::network::{TcpMessageHandler, MAX_FILE_SIZE};
+use shared::network::{MAX_FILE_SIZE, TcpMessageHandler};
 use std::collections::HashSet;
 use std::io;
 use std::net::AddrParseError;
@@ -15,10 +17,8 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
 use tokio::net::TcpStream;
 use tokio::time::sleep;
-use tokio_rustls::client::TlsStream;
 use tokio_rustls::TlsConnector;
-use rustls::ClientConfig;
-use rustls::pki_types::ServerName;
+use tokio_rustls::client::TlsStream;
 
 #[derive(Debug)]
 pub enum ChatClientError {
@@ -107,7 +107,8 @@ impl ChatClient {
         let (host, port, use_tls) = Self::parse_server_addr(server_addr)?;
 
         logger::log_info(&format!("Connecting to {}:{}...", host, port));
-        let stream = TcpStream::connect(format!("{}:{}", host, port)).await
+        let stream = TcpStream::connect(format!("{}:{}", host, port))
+            .await
             .map_err(|e| {
                 logger::log_error(&format!("Failed to connect to {}:{} - {}", host, port, e));
                 ChatClientError::IoError
@@ -125,17 +126,15 @@ impl ChatClient {
                 .with_no_client_auth();
 
             let connector = TlsConnector::from(Arc::new(config));
-            let server_name = ServerName::try_from(host.clone())
-                .map_err(|e| {
-                    logger::log_error(&format!("Invalid server name '{}': {:?}", host, e));
-                    io::Error::new(io::ErrorKind::InvalidInput, "Invalid server name")
-                })?;
+            let server_name = ServerName::try_from(host.clone()).map_err(|e| {
+                logger::log_error(&format!("Invalid server name '{}': {:?}", host, e));
+                io::Error::new(io::ErrorKind::InvalidInput, "Invalid server name")
+            })?;
 
-            let tls_stream = connector.connect(server_name, stream).await
-                .map_err(|e| {
-                    logger::log_error(&format!("TLS handshake failed: {}", e));
-                    ChatClientError::IoError
-                })?;
+            let tls_stream = connector.connect(server_name, stream).await.map_err(|e| {
+                logger::log_error(&format!("TLS handshake failed: {}", e));
+                ChatClientError::IoError
+            })?;
             logger::log_success("TLS connection established");
             ClientStream::Tls(Box::new(tls_stream))
         } else {
@@ -165,7 +164,8 @@ impl ChatClient {
 
         // Parse host:port
         if let Some((host, port)) = addr.rsplit_once(':') {
-            let port = port.parse::<u16>()
+            let port = port
+                .parse::<u16>()
                 .map_err(|_| ChatClientError::InvalidAddress)?;
             Ok((host.to_string(), port, use_tls))
         } else {
@@ -214,8 +214,10 @@ impl ChatClient {
                             .with_no_client_auth();
 
                         let connector = TlsConnector::from(Arc::new(config));
-                        let server_name = ServerName::try_from(self.server_host.clone())
-                            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Invalid server name"))?;
+                        let server_name =
+                            ServerName::try_from(self.server_host.clone()).map_err(|_| {
+                                io::Error::new(io::ErrorKind::InvalidInput, "Invalid server name")
+                            })?;
 
                         let tls_stream = connector.connect(server_name, stream).await?;
                         logger::log_success("TLS connection re-established");
@@ -401,13 +403,14 @@ impl ChatClient {
             return;
         }
 
-        let sender = match std::str::from_utf8(&content[sender_start + 1..sender_start + 1 + sender_len]) {
-            Ok(s) => s,
-            Err(_) => {
-                logger::log_error("Invalid sender name in file transfer");
-                return;
-            }
-        };
+        let sender =
+            match std::str::from_utf8(&content[sender_start + 1..sender_start + 1 + sender_len]) {
+                Ok(s) => s,
+                Err(_) => {
+                    logger::log_error("Invalid sender name in file transfer");
+                    return;
+                }
+            };
 
         // Extract filename
         let filename_len_pos = sender_start + 1 + sender_len;
@@ -418,13 +421,14 @@ impl ChatClient {
             return;
         }
 
-        let filename = match std::str::from_utf8(&content[filename_start..filename_start + filename_len]) {
-            Ok(s) => s,
-            Err(_) => {
-                logger::log_error("Invalid filename in file transfer");
-                return;
-            }
-        };
+        let filename =
+            match std::str::from_utf8(&content[filename_start..filename_start + filename_len]) {
+                Ok(s) => s,
+                Err(_) => {
+                    logger::log_error("Invalid filename in file transfer");
+                    return;
+                }
+            };
 
         let file_data = &content[filename_start + filename_len..];
 
@@ -522,16 +526,15 @@ impl ChatClient {
                 Ok(())
             }
             input::ClientUserInput::Rename(new_name) => {
-                let message = ChatMessage::try_new(
-                    MessageTypes::RenameRequest,
-                    Some(new_name.into_bytes()),
-                )?;
+                let message =
+                    ChatMessage::try_new(MessageTypes::RenameRequest, Some(new_name.into_bytes()))?;
                 self.send_message_chunked(message).await?;
                 Ok(())
             }
-            input::ClientUserInput::SendFile { recipient, file_path } => {
-                self.send_file(&recipient, &file_path).await
-            }
+            input::ClientUserInput::SendFile {
+                recipient,
+                file_path,
+            } => self.send_file(&recipient, &file_path).await,
             input::ClientUserInput::Status(status) => {
                 let content = status.map(|s| s.into_bytes());
                 let message = ChatMessage::try_new(MessageTypes::SetStatus, content)?;
@@ -552,7 +555,8 @@ impl ChatClient {
         }
 
         // Get file name
-        let file_name = path.file_name()
+        let file_name = path
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
 
