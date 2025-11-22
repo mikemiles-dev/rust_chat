@@ -258,8 +258,18 @@ impl ChatClient {
         })
     }
 
-    async fn handle_message(&mut self, message: ChatMessage) {
+    async fn handle_message(&mut self, message: ChatMessage) -> bool {
         match message.msg_type {
+            MessageTypes::Ping => {
+                // Respond to server ping with pong
+                if let Ok(pong_msg) = ChatMessage::try_new(MessageTypes::Pong, None)
+                    && let Err(e) = self.send_message_chunked(pong_msg).await
+                {
+                    logger::log_warning(&format!("Failed to send pong: {:?}", e));
+                    return false; // Signal connection issue
+                }
+                return true;
+            }
             MessageTypes::Join => {
                 if let Some(content) = self.get_message_content(&message, "join") {
                     logger::log_system(&format!("{} has joined the chat", content));
@@ -338,10 +348,14 @@ impl ChatClient {
                     logger::log_success(&content);
                 }
             }
+            MessageTypes::Pong => {
+                // Ignore pong messages (we don't send pings from client)
+            }
             _ => {
                 logger::log_warning(&format!("Unknown message type: {:?}", message.msg_type));
             }
         }
+        true
     }
 
     fn handle_file_transfer(&self, message: &ChatMessage) {
@@ -597,7 +611,10 @@ impl ChatClient {
                 result = self.read_message_chunked() => {
                     match result {
                         Ok(message) => {
-                            self.handle_message(message).await;
+                            if !self.handle_message(message).await {
+                                // handle_message returned false, indicating a connection issue
+                                logger::log_warning("Connection issue detected while handling message");
+                            }
                         }
                         Err(shared::network::TcpMessageHandlerError::IoError(_)) |
                         Err(shared::network::TcpMessageHandlerError::Disconnect) => {

@@ -11,6 +11,15 @@ use std::io::{self, Write};
 const DEFAULT_SERVER: &str = "tls://milesrust.chat:8443";
 const DEFAULT_NAME: &str = "Guest";
 
+/// Restore terminal to a sane state (cursor visible, line buffered, echo on)
+fn restore_terminal() {
+    // Show cursor (ANSI escape sequence)
+    print!("\x1B[?25h");
+    // Reset all attributes
+    print!("\x1B[0m");
+    let _ = io::stdout().flush();
+}
+
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let (chat_server, chat_name) = get_server_info()?;
@@ -24,7 +33,19 @@ async fn main() -> io::Result<()> {
     client.join_server().await
         .map_err(|e| io::Error::other(format!("Failed to join server: {e:?}")))?;
 
-    client.run().await
+    // Run client with Ctrl+C handling
+    tokio::select! {
+        result = client.run() => {
+            restore_terminal();
+            result
+        }
+        _ = tokio::signal::ctrl_c() => {
+            restore_terminal();
+            println!(); // New line after ^C
+            logger::log_info("Interrupted, exiting...");
+            Ok(())
+        }
+    }
 }
 
 fn prompt_input(prompt: &str, default: &str) -> io::Result<String> {

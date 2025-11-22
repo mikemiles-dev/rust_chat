@@ -15,10 +15,16 @@ use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::TcpStream;
 use tokio::sync::{RwLock, broadcast};
 use tokio_rustls::server::TlsStream;
+
+/// How often to send ping messages to clients
+const PING_INTERVAL: Duration = Duration::from_secs(30);
+/// How long to wait for a pong response before considering the client dead
+const PONG_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub enum ConnectionStream {
     Plain(TcpStream),
@@ -135,12 +141,25 @@ impl UserConnection {
         let mut rx = self.tx.subscribe();
         let mut cmd_rx = self.server_commands.subscribe();
 
+        // Heartbeat tracking
+        let mut last_activity = Instant::now();
+        let mut ping_interval = tokio::time::interval(PING_INTERVAL);
+        ping_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
         loop {
             tokio::select! {
                 // Branch 1: Receive from client
                 result = self.read_message_chunked() => {
                     match result {
                         Ok(msg) => {
+                            // Update last activity on any message received
+                            last_activity = Instant::now();
+
+                            // Handle Pong silently (just updates last_activity above)
+                            if msg.msg_type == MessageTypes::Pong {
+                                continue;
+                            }
+
                             if let Err(e) = self.process_message(msg).await {
                                 logger::log_error(&format!("Error handling message from {}: {:?}", self.addr, e));
                             }
@@ -238,6 +257,27 @@ impl UserConnection {
                         Err(_) => {
                             // Channel closed, ignore
                         }
+                    }
+                }
+                // Branch 4: Periodic ping and timeout check
+                _ = ping_interval.tick() => {
+                    // Check if client has timed out (no activity for PONG_TIMEOUT)
+                    if last_activity.elapsed() > PONG_TIMEOUT {
+                        logger::log_warning(&format!(
+                            "Client {} ({:?}) timed out - no response for {:?}",
+                            self.addr,
+                            self.chat_name,
+                            last_activity.elapsed()
+                        ));
+                        break;
+                    }
+
+                    // Send ping to client
+                    if let Ok(ping_msg) = ChatMessage::try_new(MessageTypes::Ping, None)
+                        && let Err(e) = self.send_message_chunked(ping_msg).await
+                    {
+                        logger::log_warning(&format!("Failed to send ping to {}: {:?}", self.addr, e));
+                        break;
                     }
                 }
             }

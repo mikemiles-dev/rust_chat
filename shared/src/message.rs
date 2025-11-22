@@ -11,6 +11,8 @@ pub enum MessageTypes {
     FileTransfer,      // File data being sent: recipient|sender|filename|data
     FileTransferAck,   // Acknowledgment that file was received
     SetStatus,         // Set user's status message
+    Ping,              // Server heartbeat to check if client is alive
+    Pong,              // Client response to Ping
     Unknown(u8),
 }
 
@@ -28,6 +30,8 @@ impl From<u8> for MessageTypes {
             9 => MessageTypes::FileTransfer,
             10 => MessageTypes::FileTransferAck,
             11 => MessageTypes::SetStatus,
+            12 => MessageTypes::Ping,
+            13 => MessageTypes::Pong,
             other => MessageTypes::Unknown(other),
         }
     }
@@ -127,6 +131,8 @@ impl From<ChatMessage> for Vec<u8> {
             MessageTypes::FileTransfer => 9,
             MessageTypes::FileTransferAck => 10,
             MessageTypes::SetStatus => 11,
+            MessageTypes::Ping => 12,
+            MessageTypes::Pong => 13,
             MessageTypes::Unknown(val) => val,
         });
         if let Some(content) = message.content {
