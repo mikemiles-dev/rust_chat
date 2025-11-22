@@ -6,6 +6,7 @@ use shared::commands::client as commands;
 use shared::logger;
 use shared::message::{ChatMessage, ChatMessageError, MessageTypes};
 use shared::network::{MAX_FILE_SIZE, TcpMessageHandler};
+use shared::version::VERSION;
 use std::collections::HashSet;
 use std::io;
 use std::net::AddrParseError;
@@ -177,6 +178,15 @@ impl ChatClient {
     }
 
     pub async fn join_server(&mut self) -> Result<(), ChatClientError> {
+        // First send version check
+        logger::log_info(&format!("Sending version check (v{})...", VERSION));
+        let version_message = ChatMessage::try_new(
+            MessageTypes::VersionCheck,
+            Some(VERSION.as_bytes().to_vec()),
+        )?;
+        self.send_message_chunked(version_message).await?;
+
+        // Send join message with username
         let chat_message =
             ChatMessage::try_new(MessageTypes::Join, Some(self.chat_name.as_bytes().to_vec()))?;
         self.send_message_chunked(chat_message).await?;
@@ -365,6 +375,31 @@ impl ChatClient {
             }
             MessageTypes::Pong => {
                 // Ignore pong messages (we don't send pings from client)
+            }
+            MessageTypes::VersionMismatch => {
+                if let Some(content) = self.get_message_content(&message, "version mismatch") {
+                    let parts: Vec<&str> = content.split('|').collect();
+                    if parts.len() >= 3 {
+                        logger::log_error(&format!(
+                            "Version mismatch: client v{} != server v{}",
+                            parts[0], parts[1]
+                        ));
+                        logger::log_error(&format!(
+                            "Please upgrade your binary or Docker image. See: {}",
+                            parts[2]
+                        ));
+                    } else {
+                        logger::log_error(
+                            "Version mismatch with server. Please upgrade your client.",
+                        );
+                    }
+                    // Mark as kicked so we don't try to reconnect
+                    self.was_kicked = true;
+                    return false;
+                }
+            }
+            MessageTypes::VersionCheck => {
+                // Server shouldn't send this to client, ignore
             }
             _ => {
                 logger::log_warning(&format!("Unknown message type: {:?}", message.msg_type));

@@ -10,6 +10,7 @@ pub enum UserConnectionError {
     JoinError,
     InvalidMessage,
     ExplicitQuit,
+    VersionMismatch,
 }
 
 impl std::fmt::Display for UserConnectionError {
@@ -20,6 +21,7 @@ impl std::fmt::Display for UserConnectionError {
             UserConnectionError::JoinError => write!(f, "Join Error: Username already taken"),
             UserConnectionError::InvalidMessage => write!(f, "Invalid Message Error"),
             UserConnectionError::ExplicitQuit => write!(f, "User explicitly quit"),
+            UserConnectionError::VersionMismatch => write!(f, "Client/Server version mismatch"),
         }
     }
 }

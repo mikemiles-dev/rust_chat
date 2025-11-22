@@ -13,6 +13,8 @@ pub enum MessageTypes {
     SetStatus,       // Set user's status message
     Ping,            // Server heartbeat to check if client is alive
     Pong,            // Client response to Ping
+    VersionCheck,    // Client sends version to server on connection: version string
+    VersionMismatch, // Server responds with mismatch error: client_version|server_version|readme_url
     Unknown(u8),
 }
 
@@ -32,6 +34,8 @@ impl From<u8> for MessageTypes {
             11 => MessageTypes::SetStatus,
             12 => MessageTypes::Ping,
             13 => MessageTypes::Pong,
+            14 => MessageTypes::VersionCheck,
+            15 => MessageTypes::VersionMismatch,
             other => MessageTypes::Unknown(other),
         }
     }
@@ -133,6 +137,8 @@ impl From<ChatMessage> for Vec<u8> {
             MessageTypes::SetStatus => 11,
             MessageTypes::Ping => 12,
             MessageTypes::Pong => 13,
+            MessageTypes::VersionCheck => 14,
+            MessageTypes::VersionMismatch => 15,
             MessageTypes::Unknown(val) => val,
         });
         if let Some(content) = message.content {

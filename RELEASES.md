@@ -1,3 +1,6 @@
+# 0.1.9
+ * Added client/server version checking. Clients with mismatched versions are disconnected with a link to upgrade instructions.
+
 # 0.1.8
  * Status now persists across reconnections but is cleared on explicit `/quit`, kick, or ban.
 

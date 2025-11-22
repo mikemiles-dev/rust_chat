@@ -173,6 +173,11 @@ impl UserConnection {
                                     self.clear_status_on_disconnect = true;
                                     break;
                                 }
+                                Err(UserConnectionError::VersionMismatch) => {
+                                    // Version mismatch - disconnect client (error already sent)
+                                    logger::log_warning(&format!("Client {} disconnected due to version mismatch", self.addr));
+                                    break;
+                                }
                                 Err(e) => {
                                     logger::log_error(&format!("Error handling message from {}: {:?}", self.addr, e));
                                 }

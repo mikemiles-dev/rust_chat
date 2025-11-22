@@ -2,6 +2,7 @@ use rand::Rng;
 use shared::logger;
 use shared::message::{ChatMessage, MessageTypes};
 use shared::network::TcpMessageHandler;
+use shared::version::{self, VERSION};
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
@@ -67,6 +68,10 @@ impl<'a> MessageHandlers<'a> {
         }
 
         match message.msg_type {
+            MessageTypes::VersionCheck => {
+                self.process_version_check(message.content_as_string(), &mut tcp_handler)
+                    .await?;
+            }
             MessageTypes::Join => {
                 self.process_join(message.content_as_string(), &mut tcp_handler, chat_name)
                     .await?;
@@ -608,6 +613,46 @@ impl<'a> MessageHandlers<'a> {
             .await
             .map_err(UserConnectionError::IoError)?;
 
+        Ok(())
+    }
+
+    async fn process_version_check<S: AsyncRead + AsyncWrite + Unpin>(
+        &self,
+        client_version: Option<String>,
+        tcp_handler: &mut StreamWrapper<'_, S>,
+    ) -> Result<(), UserConnectionError> {
+        let client_version = client_version.ok_or(UserConnectionError::InvalidMessage)?;
+
+        if !version::versions_compatible(&client_version, VERSION) {
+            logger::log_warning(&format!(
+                "Version mismatch from {}: client v{} != server v{}",
+                self.addr, client_version, VERSION
+            ));
+
+            // Send version mismatch error with details
+            let mismatch_content = format!(
+                "{}|{}|{}",
+                client_version,
+                VERSION,
+                version::GITHUB_README_URL
+            );
+            let mismatch_msg = ChatMessage::try_new(
+                MessageTypes::VersionMismatch,
+                Some(mismatch_content.into_bytes()),
+            )
+            .map_err(|_| UserConnectionError::InvalidMessage)?;
+            tcp_handler
+                .send_message_chunked(mismatch_msg)
+                .await
+                .map_err(UserConnectionError::IoError)?;
+
+            return Err(UserConnectionError::VersionMismatch);
+        }
+
+        logger::log_info(&format!(
+            "Version check passed for {}: v{}",
+            self.addr, client_version
+        ));
         Ok(())
     }
 }

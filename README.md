@@ -25,6 +25,7 @@ A modern, colorful terminal-based chat application written in Rust with async/aw
 - 🚀 **Production Ready** - Docker and native systemd deployment options
 - 👮 **Admin Commands** - Server-side `/kick`, `/ban`, `/rename` and user management
 - 📝 **User Status** - Set a custom status message visible to other users
+- 🔢 **Version Compatibility** - Client/server version checking with upgrade notifications
 
 ## Architecture
 
@@ -604,6 +605,20 @@ The application implements comprehensive security measures to protect against co
 
 **Note**: For production deployment, TLS encryption is built-in. Consider adding authentication and E2E encryption for enhanced security.
 
+### Version Compatibility
+
+The client and server perform version checking on connection:
+- **Automatic Check**: Client sends its version to the server on connect
+- **Mismatch Handling**: If versions don't match, server disconnects client with an error
+- **Upgrade Instructions**: Error message includes a link to the GitHub README for upgrade instructions
+- **Compile-time Version**: Version is automatically derived from `Cargo.toml`
+
+Example version mismatch error:
+```
+[ERROR] Version mismatch: client v0.1.8 != server v0.1.9
+[ERROR] Please upgrade your binary or Docker image. See: https://github.com/mikemiles-dev/rust_chat#readme
+```
+
 ### Message Protocol
 
 Messages are sent over TCP with a custom chunked protocol that supports:
@@ -615,6 +630,7 @@ Messages are sent over TCP with a custom chunked protocol that supports:
 - User list requests
 - User status updates
 - File transfers
+- Version checking
 - Error messages
 
 ## Building from Source
