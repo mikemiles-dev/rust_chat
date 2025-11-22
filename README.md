@@ -191,44 +191,40 @@ CHAT_SERVER_MAX_CLIENTS="50" cargo run --bin server
 
 #### Starting the Client
 
-**Option 1: Connect to Live Demo Server**
+**Option 1: Connect to Live Demo Server (Default)**
 
-Try out the chat by connecting to the live instance:
-
-```bash
-cargo run --bin client
-# When prompted:
-# Server: tls://milesrust.chat:8443
-# Username: YourName
-```
-
-Or use environment variables:
-
-```bash
-CHAT_SERVER="tls://milesrust.chat:8443" CHAT_USERNAME="YourName" cargo run --bin client
-```
-
-**Option 2: Local Development**
+The client connects to the live TLS-secured server by default:
 
 ```bash
 cargo run --bin client
+# Press Enter to accept default server (tls://milesrust.chat:8443)
+# Enter your username
 ```
 
-You'll be prompted to enter:
-1. **Server address** (default: `127.0.0.1:8080`)
-2. **Username** (default: `Guest`)
-
-Alternatively, you can use environment variables to skip the prompts:
+Or skip the prompts with environment variables:
 
 ```bash
-# Set both server and username
+CHAT_USERNAME="YourName" cargo run --bin client
+```
+
+**Option 2: Connect to Local Server**
+
+To connect to a local development server instead:
+
+```bash
+CHAT_SERVER="127.0.0.1:8080" cargo run --bin client
+```
+
+Or enter the server address when prompted.
+
+**Environment Variables:**
+
+```bash
+# Connect to local server with custom username
 CHAT_SERVER="127.0.0.1:8080" CHAT_USERNAME="Alice" cargo run --bin client
 
-# Set only server (will prompt for username)
-CHAT_SERVER="chat.example.com:443" cargo run --bin client
-
-# Set only username (will prompt for server)
-CHAT_USERNAME="Bob" cargo run --bin client
+# Connect to custom server
+CHAT_SERVER="tls://your-server.com:8443" CHAT_USERNAME="Bob" cargo run --bin client
 ```
 
 ### Production Deployment
@@ -303,7 +299,7 @@ Both client and server support advanced input features powered by rustyline:
 ### Example Client Session
 
 ```
-[12:34:56] [INFO] Enter Chat Server (default: 127.0.0.1:8080):
+[12:34:56] [INFO] Enter Chat Server (default: tls://milesrust.chat:8443):
 [12:34:58] [INFO] Enter Chat Name (default: Guest):
 Alice
 [12:34:59] [SYSTEM] Alice has joined the chat
