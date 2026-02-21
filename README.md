@@ -1,6 +1,6 @@
 # rust_chat
 
-A modern, colorful terminal-based chat application written in Rust with async/await support.
+A modern, colorful terminal-based chat application written in Rust.
 
 ![Usage](usage.png)
 
