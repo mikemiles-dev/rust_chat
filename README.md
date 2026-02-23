@@ -375,29 +375,33 @@ Alice /r Perfect! Let's discuss the project.
 rust_chat/
 ├── client/
 │   └── src/
-│       ├── main.rs          # Entry point and setup
-│       ├── client.rs        # Client logic and message handling
-│       ├── input.rs         # Client command processing
-│       ├── completer.rs     # Tab completion for commands & usernames
-│       └── readline_helper.rs # Rustyline integration with async
+│       ├── main.rs            # Entry point and setup
+│       ├── client.rs          # Client logic and message handling
+│       ├── file_transfer.rs   # Client-side file transfer handling
+│       └── input.rs           # Client command processing
 ├── server/
 │   └── src/
-│       ├── main.rs          # Server entry point and command handling
-│       ├── input.rs         # Server command processing
-│       ├── completer.rs     # Tab completion for server commands
-│       ├── readline_helper.rs # Rustyline integration with async
+│       ├── main.rs            # Server entry point and command handling
+│       ├── input.rs           # Server command processing
 │       └── user_connection/
-│           ├── mod.rs       # UserConnection struct and event loop
-│           ├── error.rs     # Error types and Display impl
-│           ├── handlers.rs  # Message processing logic
-│           └── rate_limiting.rs # Token bucket rate limiter
+│           ├── mod.rs         # UserConnection struct and event loop
+│           ├── error.rs       # Error types and Display impl
+│           ├── handlers.rs    # Message router and shared helpers
+│           ├── user_handlers.rs    # Join, rename, version check handlers
+│           ├── message_handlers.rs # Chat, DM, list, status handlers
+│           ├── file_transfer_handlers.rs # File transfer handlers
+│           └── rate_limiting.rs    # Token bucket rate limiter
 ├── shared/
 │   └── src/
-│       ├── lib.rs           # Module exports
-│       ├── input.rs         # Shared UserInput trait
-│       ├── logger.rs        # Colorized logging utilities
-│       ├── message.rs       # Message protocol
-│       └── network.rs       # TCP message handling
+│       ├── lib.rs             # Module exports
+│       ├── commands.rs        # Shared command definitions
+│       ├── completer.rs       # Tab completion for commands & usernames
+│       ├── input.rs           # Shared UserInput trait
+│       ├── logger.rs          # Colorized logging utilities
+│       ├── message.rs         # Message protocol with named constants
+│       ├── network.rs         # TCP message handling
+│       ├── readline.rs        # Shared rustyline integration with async
+│       └── version.rs         # Version checking utilities
 └── deploy/
     └── digital_ocean/
         ├── setup-certificates.sh # Get Let's Encrypt TLS certificates
@@ -447,6 +451,7 @@ Powered by `rustyline`, both client and server feature a rich command-line exper
 - Helps you discover commands without referring to documentation
 
 **Implementation Details:**
+- Shared implementation in `shared::readline` and `shared::completer` used by both client and server
 - Runs in a separate blocking thread to maintain async performance
 - Communicates with async runtime via `tokio::sync::mpsc` channels
 - Client tracks connected users list for username autocomplete

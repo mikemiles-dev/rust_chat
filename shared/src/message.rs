@@ -1,3 +1,6 @@
+/// Protocol header size: 4 bytes for message length + 1 byte for message type.
+pub const HEADER_SIZE: usize = 5;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MessageTypes {
     ChatMessage,
@@ -20,26 +23,46 @@ pub enum MessageTypes {
     Unknown(u8),
 }
 
+impl MessageTypes {
+    pub const CHAT_MESSAGE_BYTE: u8 = 1;
+    pub const JOIN_BYTE: u8 = 2;
+    pub const LEAVE_BYTE: u8 = 3;
+    pub const USER_RENAME_BYTE: u8 = 4;
+    pub const LIST_USERS_BYTE: u8 = 5;
+    pub const DIRECT_MESSAGE_BYTE: u8 = 6;
+    pub const ERROR_BYTE: u8 = 7;
+    pub const RENAME_REQUEST_BYTE: u8 = 8;
+    pub const FILE_TRANSFER_BYTE: u8 = 9;
+    pub const FILE_TRANSFER_ACK_BYTE: u8 = 10;
+    pub const FILE_TRANSFER_REQUEST_BYTE: u8 = 11;
+    pub const FILE_TRANSFER_RESPONSE_BYTE: u8 = 12;
+    pub const SET_STATUS_BYTE: u8 = 13;
+    pub const PING_BYTE: u8 = 14;
+    pub const PONG_BYTE: u8 = 15;
+    pub const VERSION_CHECK_BYTE: u8 = 16;
+    pub const VERSION_MISMATCH_BYTE: u8 = 17;
+}
+
 impl From<u8> for MessageTypes {
     fn from(value: u8) -> Self {
         match value {
-            1 => MessageTypes::ChatMessage,
-            2 => MessageTypes::Join,
-            3 => MessageTypes::Leave,
-            4 => MessageTypes::UserRename,
-            5 => MessageTypes::ListUsers,
-            6 => MessageTypes::DirectMessage,
-            7 => MessageTypes::Error,
-            8 => MessageTypes::RenameRequest,
-            9 => MessageTypes::FileTransfer,
-            10 => MessageTypes::FileTransferAck,
-            11 => MessageTypes::FileTransferRequest,
-            12 => MessageTypes::FileTransferResponse,
-            13 => MessageTypes::SetStatus,
-            14 => MessageTypes::Ping,
-            15 => MessageTypes::Pong,
-            16 => MessageTypes::VersionCheck,
-            17 => MessageTypes::VersionMismatch,
+            Self::CHAT_MESSAGE_BYTE => MessageTypes::ChatMessage,
+            Self::JOIN_BYTE => MessageTypes::Join,
+            Self::LEAVE_BYTE => MessageTypes::Leave,
+            Self::USER_RENAME_BYTE => MessageTypes::UserRename,
+            Self::LIST_USERS_BYTE => MessageTypes::ListUsers,
+            Self::DIRECT_MESSAGE_BYTE => MessageTypes::DirectMessage,
+            Self::ERROR_BYTE => MessageTypes::Error,
+            Self::RENAME_REQUEST_BYTE => MessageTypes::RenameRequest,
+            Self::FILE_TRANSFER_BYTE => MessageTypes::FileTransfer,
+            Self::FILE_TRANSFER_ACK_BYTE => MessageTypes::FileTransferAck,
+            Self::FILE_TRANSFER_REQUEST_BYTE => MessageTypes::FileTransferRequest,
+            Self::FILE_TRANSFER_RESPONSE_BYTE => MessageTypes::FileTransferResponse,
+            Self::SET_STATUS_BYTE => MessageTypes::SetStatus,
+            Self::PING_BYTE => MessageTypes::Ping,
+            Self::PONG_BYTE => MessageTypes::Pong,
+            Self::VERSION_CHECK_BYTE => MessageTypes::VersionCheck,
+            Self::VERSION_MISMATCH_BYTE => MessageTypes::VersionMismatch,
             other => MessageTypes::Unknown(other),
         }
     }
@@ -78,9 +101,9 @@ impl ChatMessage {
         let msg_len = match &content {
             Some(data) => data
                 .len()
-                .checked_add(5) // 4 bytes for length + 1 byte for type
+                .checked_add(HEADER_SIZE)
                 .ok_or(ChatMessageError::InvalidLength)?,
-            None => 5, // only msg_type byte + len (4 bytes)
+            None => HEADER_SIZE,
         };
         Ok(ChatMessage {
             msg_len: u32::try_from(msg_len).map_err(|_| ChatMessageError::InvalidLength)?,
@@ -90,27 +113,20 @@ impl ChatMessage {
     }
 }
 
-// Protocol: [msg_len (4 bytes)][msg_type (1 byte)][content (msg_len - 5 bytes)]
+// Protocol: [msg_len (4 bytes)][msg_type (1 byte)][content (msg_len - HEADER_SIZE bytes)]
 impl From<Vec<u8>> for ChatMessage {
     fn from(buffer: Vec<u8>) -> Self {
-        if buffer.is_empty() {
+        if buffer.len() < HEADER_SIZE {
             return ChatMessage {
-                msg_len: 5,
-                msg_type: MessageTypes::Unknown(0),
-                content: None,
-            };
-        }
-        if buffer.len() < 5 {
-            return ChatMessage {
-                msg_len: 5,
+                msg_len: HEADER_SIZE as u32,
                 msg_type: MessageTypes::Unknown(0),
                 content: None,
             };
         }
         let msg_len = u32::from_be_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]);
         let msg_type = MessageTypes::from(buffer[4]);
-        let content = if buffer.len() > 5 {
-            Some(buffer[5..].to_vec())
+        let content = if buffer.len() > HEADER_SIZE {
+            Some(buffer[HEADER_SIZE..].to_vec())
         } else {
             None
         };
@@ -128,23 +144,23 @@ impl From<ChatMessage> for Vec<u8> {
         let mut buffer = Vec::new();
         buffer.extend_from_slice(&message.msg_len.to_be_bytes());
         buffer.push(match message.msg_type {
-            MessageTypes::ChatMessage => 1,
-            MessageTypes::Join => 2,
-            MessageTypes::Leave => 3,
-            MessageTypes::UserRename => 4,
-            MessageTypes::ListUsers => 5,
-            MessageTypes::DirectMessage => 6,
-            MessageTypes::Error => 7,
-            MessageTypes::RenameRequest => 8,
-            MessageTypes::FileTransfer => 9,
-            MessageTypes::FileTransferAck => 10,
-            MessageTypes::FileTransferRequest => 11,
-            MessageTypes::FileTransferResponse => 12,
-            MessageTypes::SetStatus => 13,
-            MessageTypes::Ping => 14,
-            MessageTypes::Pong => 15,
-            MessageTypes::VersionCheck => 16,
-            MessageTypes::VersionMismatch => 17,
+            MessageTypes::ChatMessage => MessageTypes::CHAT_MESSAGE_BYTE,
+            MessageTypes::Join => MessageTypes::JOIN_BYTE,
+            MessageTypes::Leave => MessageTypes::LEAVE_BYTE,
+            MessageTypes::UserRename => MessageTypes::USER_RENAME_BYTE,
+            MessageTypes::ListUsers => MessageTypes::LIST_USERS_BYTE,
+            MessageTypes::DirectMessage => MessageTypes::DIRECT_MESSAGE_BYTE,
+            MessageTypes::Error => MessageTypes::ERROR_BYTE,
+            MessageTypes::RenameRequest => MessageTypes::RENAME_REQUEST_BYTE,
+            MessageTypes::FileTransfer => MessageTypes::FILE_TRANSFER_BYTE,
+            MessageTypes::FileTransferAck => MessageTypes::FILE_TRANSFER_ACK_BYTE,
+            MessageTypes::FileTransferRequest => MessageTypes::FILE_TRANSFER_REQUEST_BYTE,
+            MessageTypes::FileTransferResponse => MessageTypes::FILE_TRANSFER_RESPONSE_BYTE,
+            MessageTypes::SetStatus => MessageTypes::SET_STATUS_BYTE,
+            MessageTypes::Ping => MessageTypes::PING_BYTE,
+            MessageTypes::Pong => MessageTypes::PONG_BYTE,
+            MessageTypes::VersionCheck => MessageTypes::VERSION_CHECK_BYTE,
+            MessageTypes::VersionMismatch => MessageTypes::VERSION_MISMATCH_BYTE,
             MessageTypes::Unknown(val) => val,
         });
         if let Some(content) = message.content {
@@ -152,6 +168,42 @@ impl From<ChatMessage> for Vec<u8> {
         }
         buffer
     }
+}
+
+/// Push a length-prefixed string onto a buffer. Returns an error if the string exceeds 255 bytes.
+pub fn push_length_prefixed(buf: &mut Vec<u8>, s: &str) -> Result<(), &'static str> {
+    let len = u8::try_from(s.len()).map_err(|_| "string exceeds 255 bytes for length prefix")?;
+    buf.push(len);
+    buf.extend_from_slice(s.as_bytes());
+    Ok(())
+}
+
+/// Validate that a byte slice has at least `required` bytes remaining from `offset`.
+pub fn validate_binary_length(
+    data: &[u8],
+    offset: usize,
+    required: usize,
+) -> Result<(), &'static str> {
+    if data.len().saturating_sub(offset) < required {
+        return Err("insufficient data length");
+    }
+    Ok(())
+}
+
+/// Extract a length-prefixed string from `data` at `offset`.
+/// Format: `[1-byte length][string bytes]`.
+/// Returns the extracted string slice and the new offset past the string.
+pub fn extract_length_prefixed_string(
+    data: &[u8],
+    offset: usize,
+) -> Result<(&str, usize), &'static str> {
+    validate_binary_length(data, offset, 1)?;
+    let len = data[offset] as usize;
+    let start = offset + 1;
+    validate_binary_length(data, start, len)?;
+    let s = std::str::from_utf8(&data[start..start + len])
+        .map_err(|_| "invalid UTF-8 in length-prefixed string")?;
+    Ok((s, start + len))
 }
 
 #[cfg(test)]
@@ -173,7 +225,7 @@ mod tests {
         let msg = ChatMessage::try_new(MessageTypes::ListUsers, None);
         assert!(msg.is_ok());
         let msg = msg.unwrap();
-        assert_eq!(msg.msg_len, 5); // 4 bytes length + 1 byte type
+        assert_eq!(msg.msg_len, HEADER_SIZE as u32);
         assert_eq!(msg.content, None);
     }
 
@@ -257,5 +309,63 @@ mod tests {
         )
         .unwrap();
         assert_eq!(msg.content_as_string(), None);
+    }
+
+    #[test]
+    fn test_validate_binary_length_sufficient() {
+        assert!(validate_binary_length(&[0, 1, 2, 3], 0, 4).is_ok());
+        assert!(validate_binary_length(&[0, 1, 2, 3], 2, 2).is_ok());
+        assert!(validate_binary_length(&[0, 1, 2, 3], 4, 0).is_ok());
+    }
+
+    #[test]
+    fn test_validate_binary_length_insufficient() {
+        assert!(validate_binary_length(&[0, 1], 0, 3).is_err());
+        assert!(validate_binary_length(&[0, 1], 2, 1).is_err());
+        assert!(validate_binary_length(&[], 0, 1).is_err());
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_success() {
+        // "hi" prefixed with length 2
+        let data = [2, b'h', b'i', 99];
+        let (s, offset) = extract_length_prefixed_string(&data, 0).unwrap();
+        assert_eq!(s, "hi");
+        assert_eq!(offset, 3);
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_at_offset() {
+        let data = [0xFF, 3, b'f', b'o', b'o'];
+        let (s, offset) = extract_length_prefixed_string(&data, 1).unwrap();
+        assert_eq!(s, "foo");
+        assert_eq!(offset, 5);
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_empty() {
+        let data = [0];
+        let (s, offset) = extract_length_prefixed_string(&data, 0).unwrap();
+        assert_eq!(s, "");
+        assert_eq!(offset, 1);
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_no_length_byte() {
+        let data: [u8; 0] = [];
+        assert!(extract_length_prefixed_string(&data, 0).is_err());
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_insufficient_content() {
+        // Says 5 bytes but only 2 available
+        let data = [5, b'a', b'b'];
+        assert!(extract_length_prefixed_string(&data, 0).is_err());
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_invalid_utf8() {
+        let data = [2, 0xFF, 0xFE];
+        assert!(extract_length_prefixed_string(&data, 0).is_err());
     }
 }

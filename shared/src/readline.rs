@@ -1,20 +1,30 @@
-use crate::completer::ClientCompleter;
+use crate::completer::CommandCompleter;
 use rustyline::Editor;
 use rustyline::config::Configurer;
-use std::collections::HashSet;
-use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 
-/// Runs rustyline in a blocking thread and sends input via channel
+/// Spawns a rustyline handler in a blocking thread and sends input via channel.
+///
+/// If `require_tty` is true and no TTY is available, panics.
+/// If `require_tty` is false and no TTY is available, returns `None`.
 pub fn spawn_readline_handler(
-    users: Arc<RwLock<HashSet<String>>>,
-    _prompt: String,
-) -> mpsc::UnboundedReceiver<Option<String>> {
+    completer: CommandCompleter,
+    require_tty: bool,
+) -> Option<mpsc::UnboundedReceiver<Option<String>>> {
     let (tx, rx) = mpsc::unbounded_channel();
 
+    let rl = match Editor::new() {
+        Ok(rl) => rl,
+        Err(_) if require_tty => {
+            panic!("Failed to create editor: no TTY available");
+        }
+        Err(_) => {
+            return None;
+        }
+    };
+
     std::thread::spawn(move || {
-        let completer = ClientCompleter::new(users);
-        let mut rl = Editor::new().expect("Failed to create editor");
+        let mut rl = rl;
         rl.set_helper(Some(completer));
         rl.set_auto_add_history(true);
         rl.set_max_history_size(1000).ok();
@@ -34,5 +44,5 @@ pub fn spawn_readline_handler(
         }
     });
 
-    rx
+    Some(rx)
 }

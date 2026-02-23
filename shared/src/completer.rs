@@ -3,23 +3,41 @@ use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
 use rustyline::{Context, Helper};
-use shared::commands::server as commands;
+use std::collections::HashSet;
+use std::sync::{Arc, RwLock};
 
-/// Server command completer
-pub struct ServerCompleter {
+/// Shared command and optional username completer for rustyline.
+pub struct CommandCompleter {
     commands: Vec<&'static str>,
+    users: Option<Arc<RwLock<HashSet<String>>>>,
 }
 
-impl ServerCompleter {
-    pub fn new() -> Self {
-        Self {
-            commands: commands::completion_names(),
-        }
+impl CommandCompleter {
+    pub fn new(commands: Vec<&'static str>, users: Option<Arc<RwLock<HashSet<String>>>>) -> Self {
+        Self { commands, users }
     }
 
     fn get_candidates(&self, line: &str) -> Vec<String> {
         let trimmed = line.trim_start();
 
+        // If line starts with /dm or /send and has a space, complete usernames
+        if let Some(ref users) = self.users
+            && (trimmed.starts_with("/dm ") || trimmed.starts_with("/send "))
+        {
+            let parts: Vec<&str> = trimmed.splitn(3, ' ').collect();
+            if parts.len() == 2 {
+                let cmd = parts[0];
+                let prefix = parts[1];
+                let users = users.read().expect("connected users lock poisoned");
+                return users
+                    .iter()
+                    .filter(|u| u.starts_with(prefix))
+                    .map(|u| format!("{} {}", cmd, u))
+                    .collect();
+            }
+        }
+
+        // Complete commands
         if trimmed.starts_with('/') {
             self.commands
                 .iter()
@@ -32,7 +50,7 @@ impl ServerCompleter {
     }
 }
 
-impl Completer for ServerCompleter {
+impl Completer for CommandCompleter {
     type Candidate = Pair;
 
     fn complete(
@@ -55,7 +73,7 @@ impl Completer for ServerCompleter {
     }
 }
 
-impl Hinter for ServerCompleter {
+impl Hinter for CommandCompleter {
     type Hint = String;
 
     fn hint(&self, line: &str, _pos: usize, _ctx: &Context<'_>) -> Option<String> {
@@ -70,8 +88,8 @@ impl Hinter for ServerCompleter {
     }
 }
 
-impl Highlighter for ServerCompleter {}
+impl Highlighter for CommandCompleter {}
 
-impl Validator for ServerCompleter {}
+impl Validator for CommandCompleter {}
 
-impl Helper for ServerCompleter {}
+impl Helper for CommandCompleter {}

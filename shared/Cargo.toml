@@ -7,3 +7,4 @@ edition.workspace = true
 tokio.workspace = true
 colored = "2.1.0"
 chrono = "0.4.38"
+rustyline.workspace = true
