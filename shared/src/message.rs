@@ -154,6 +154,27 @@ impl From<ChatMessage> for Vec<u8> {
     }
 }
 
+/// Validate that a byte slice has at least `required` bytes remaining from `offset`.
+pub fn validate_binary_length(data: &[u8], offset: usize, required: usize) -> Result<(), &'static str> {
+    if data.len().saturating_sub(offset) < required {
+        return Err("insufficient data length");
+    }
+    Ok(())
+}
+
+/// Extract a length-prefixed string from `data` at `offset`.
+/// Format: `[1-byte length][string bytes]`.
+/// Returns the extracted string slice and the new offset past the string.
+pub fn extract_length_prefixed_string(data: &[u8], offset: usize) -> Result<(&str, usize), &'static str> {
+    validate_binary_length(data, offset, 1)?;
+    let len = data[offset] as usize;
+    let start = offset + 1;
+    validate_binary_length(data, start, len)?;
+    let s = std::str::from_utf8(&data[start..start + len])
+        .map_err(|_| "invalid UTF-8 in length-prefixed string")?;
+    Ok((s, start + len))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,5 +278,63 @@ mod tests {
         )
         .unwrap();
         assert_eq!(msg.content_as_string(), None);
+    }
+
+    #[test]
+    fn test_validate_binary_length_sufficient() {
+        assert!(validate_binary_length(&[0, 1, 2, 3], 0, 4).is_ok());
+        assert!(validate_binary_length(&[0, 1, 2, 3], 2, 2).is_ok());
+        assert!(validate_binary_length(&[0, 1, 2, 3], 4, 0).is_ok());
+    }
+
+    #[test]
+    fn test_validate_binary_length_insufficient() {
+        assert!(validate_binary_length(&[0, 1], 0, 3).is_err());
+        assert!(validate_binary_length(&[0, 1], 2, 1).is_err());
+        assert!(validate_binary_length(&[], 0, 1).is_err());
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_success() {
+        // "hi" prefixed with length 2
+        let data = [2, b'h', b'i', 99];
+        let (s, offset) = extract_length_prefixed_string(&data, 0).unwrap();
+        assert_eq!(s, "hi");
+        assert_eq!(offset, 3);
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_at_offset() {
+        let data = [0xFF, 3, b'f', b'o', b'o'];
+        let (s, offset) = extract_length_prefixed_string(&data, 1).unwrap();
+        assert_eq!(s, "foo");
+        assert_eq!(offset, 5);
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_empty() {
+        let data = [0];
+        let (s, offset) = extract_length_prefixed_string(&data, 0).unwrap();
+        assert_eq!(s, "");
+        assert_eq!(offset, 1);
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_no_length_byte() {
+        let data: [u8; 0] = [];
+        assert!(extract_length_prefixed_string(&data, 0).is_err());
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_insufficient_content() {
+        // Says 5 bytes but only 2 available
+        let data = [5, b'a', b'b'];
+        assert!(extract_length_prefixed_string(&data, 0).is_err());
+    }
+
+    #[test]
+    fn test_extract_length_prefixed_string_invalid_utf8() {
+        let data = [2, 0xFF, 0xFE];
+        assert!(extract_length_prefixed_string(&data, 0).is_err());
     }
 }

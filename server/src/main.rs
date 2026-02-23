@@ -233,10 +233,11 @@ impl ChatServer {
     }
 
     async fn handle_kick(&self, username: String) {
-        let clients = self.connected_clients.read().await;
-        if clients.contains(&username) {
-            drop(clients);
-            // Send kick command to all connections - the matching one will disconnect
+        let found = {
+            let clients = self.connected_clients.read().await;
+            clients.contains(&username)
+        };
+        if found {
             if self
                 .server_commands
                 .send(ServerCommand::Kick(username.clone()))
@@ -250,37 +251,40 @@ impl ChatServer {
     }
 
     async fn handle_rename(&self, old_name: String, new_name: String) {
-        let mut clients = self.connected_clients.write().await;
-
-        // Check if the user to rename exists
-        if !clients.contains(&old_name) {
-            logger::log_error(&format!("User '{}' not found", old_name));
-            return;
-        }
-
-        // Check if the new name is already taken
-        if clients.contains(&new_name) {
-            logger::log_error(&format!("Username '{}' is already taken", new_name));
-            return;
-        }
-
-        // Validate new username
-        if new_name.is_empty() || new_name.len() > 32 {
-            logger::log_error("Invalid username length (1-32 characters)");
-            return;
-        }
-        if !new_name
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
         {
-            logger::log_error("Invalid characters (only alphanumeric, underscore, hyphen allowed)");
-            return;
-        }
+            let mut clients = self.connected_clients.write().await;
 
-        // Update the connected_clients set
-        clients.remove(&old_name);
-        clients.insert(new_name.clone());
-        drop(clients);
+            // Check if the user to rename exists
+            if !clients.contains(&old_name) {
+                logger::log_error(&format!("User '{}' not found", old_name));
+                return;
+            }
+
+            // Check if the new name is already taken
+            if clients.contains(&new_name) {
+                logger::log_error(&format!("Username '{}' is already taken", new_name));
+                return;
+            }
+
+            // Validate new username
+            if new_name.is_empty() || new_name.len() > 32 {
+                logger::log_error("Invalid username length (1-32 characters)");
+                return;
+            }
+            if !new_name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+            {
+                logger::log_error(
+                    "Invalid characters (only alphanumeric, underscore, hyphen allowed)",
+                );
+                return;
+            }
+
+            // Update the connected_clients set
+            clients.remove(&old_name);
+            clients.insert(new_name.clone());
+        }
 
         // Send rename command to all connections - the matching one will handle it
         if self
@@ -296,21 +300,25 @@ impl ChatServer {
     }
 
     async fn handle_ban_user(&self, username: String) {
-        // Look up the user's IP
-        let user_ips = self.user_ips.read().await;
-        let ip = match user_ips.get(&username) {
-            Some(ip) => *ip,
-            None => {
-                logger::log_error(&format!("User '{}' not found or not connected", username));
-                return;
+        let ip = {
+            let user_ips = self.user_ips.read().await;
+            match user_ips.get(&username) {
+                Some(ip) => *ip,
+                None => {
+                    logger::log_error(&format!(
+                        "User '{}' not found or not connected",
+                        username
+                    ));
+                    return;
+                }
             }
         };
-        drop(user_ips);
 
-        // Add to banned IPs
-        let mut banned = self.banned_ips.write().await;
-        if banned.insert(ip) {
-            drop(banned);
+        let newly_banned = {
+            let mut banned = self.banned_ips.write().await;
+            banned.insert(ip)
+        };
+        if newly_banned {
             logger::log_warning(&format!("Banned IP {} (user '{}')", ip, username));
 
             // Kick the user and disconnect them
@@ -323,9 +331,11 @@ impl ChatServer {
     }
 
     async fn handle_ban_ip(&self, ip: IpAddr) {
-        let mut banned = self.banned_ips.write().await;
-        if banned.insert(ip) {
-            drop(banned);
+        let newly_banned = {
+            let mut banned = self.banned_ips.write().await;
+            banned.insert(ip)
+        };
+        if newly_banned {
             logger::log_warning(&format!("Banned IP {}", ip));
 
             // Disconnect any users from this IP

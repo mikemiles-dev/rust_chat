@@ -1,4 +1,5 @@
 mod error;
+mod file_transfer_handlers;
 mod handlers;
 mod rate_limiting;
 
@@ -80,7 +81,7 @@ pub struct UserConnection {
     user_ips: Arc<RwLock<HashMap<String, IpAddr>>>,
     user_statuses: Arc<RwLock<HashMap<String, String>>>,
     user_sessions: Arc<RwLock<HashMap<String, String>>>,
-    chat_name: Option<String>,
+    username: Option<String>,
     rate_limiter: RateLimiter,
     /// True if user explicitly quit (vs connection drop which may be a reconnect)
     clear_status_on_disconnect: bool,
@@ -115,7 +116,7 @@ impl UserConnection {
             user_ips,
             user_statuses,
             user_sessions,
-            chat_name: None,
+            username: None,
             rate_limiter: RateLimiter::new(RATE_LIMIT_MESSAGES, RATE_LIMIT_WINDOW),
             clear_status_on_disconnect: false,
             session_taken_over: false,
@@ -141,7 +142,7 @@ impl UserConnection {
             user_ips,
             user_statuses,
             user_sessions,
-            chat_name: None,
+            username: None,
             rate_limiter: RateLimiter::new(RATE_LIMIT_MESSAGES, RATE_LIMIT_WINDOW),
             clear_status_on_disconnect: false,
             session_taken_over: false,
@@ -221,10 +222,10 @@ impl UserConnection {
                 // Branch 3: Server commands (kick, rename, etc.)
                 result = cmd_rx.recv() => {
                     match result {
-                        Ok(ServerCommand::Kick(username)) => {
-                            if let Some(chat_name) = &self.chat_name
-                                && chat_name == &username {
-                                logger::log_info(&format!("User {} kicked by server", chat_name));
+                        Ok(ServerCommand::Kick(target)) => {
+                            if let Some(name) = &self.username
+                                && name == &target {
+                                logger::log_info(&format!("User {} kicked by server", name));
                                 // Send error message to client before disconnecting
                                 if let Ok(kick_msg) = ChatMessage::try_new(
                                     MessageTypes::Error,
@@ -238,8 +239,8 @@ impl UserConnection {
                             }
                         }
                         Ok(ServerCommand::Rename { old_name, new_name }) => {
-                            if let Some(chat_name) = &self.chat_name
-                                && chat_name == &old_name {
+                            if let Some(name) = &self.username
+                                && name == &old_name {
                                 // Update user_ips mapping
                                 let mut ips = self.user_ips.write().await;
                                 if let Some(ip) = ips.remove(&old_name) {
@@ -247,8 +248,8 @@ impl UserConnection {
                                 }
                                 drop(ips);
 
-                                // Update the local chat_name
-                                self.chat_name = Some(new_name.clone());
+                                // Update the local username
+                                self.username = Some(new_name.clone());
 
                                 // Send UserRename message to client
                                 if let Ok(rename_msg) = ChatMessage::try_new(
@@ -273,7 +274,7 @@ impl UserConnection {
                         Ok(ServerCommand::Ban(ip)) => {
                             // Disconnect if our IP matches
                             if self.addr.ip() == ip {
-                                logger::log_info(&format!("User {:?} banned (IP {})", self.chat_name, ip));
+                                logger::log_info(&format!("User {:?} banned (IP {})", self.username, ip));
                                 // Send error message to client before disconnecting
                                 if let Ok(ban_msg) = ChatMessage::try_new(
                                     MessageTypes::Error,
@@ -286,13 +287,13 @@ impl UserConnection {
                                 break;
                             }
                         }
-                        Ok(ServerCommand::SessionTakeover(username)) => {
+                        Ok(ServerCommand::SessionTakeover(target)) => {
                             // Another connection is reclaiming this session
-                            if let Some(chat_name) = &self.chat_name
-                                && chat_name == &username {
+                            if let Some(name) = &self.username
+                                && name == &target {
                                 logger::log_info(&format!(
                                     "Session for {} taken over by reconnecting client, closing old connection",
-                                    chat_name
+                                    name
                                 ));
                                 // Mark session as taken over - don't clean up username/session on disconnect
                                 self.session_taken_over = true;
@@ -311,7 +312,7 @@ impl UserConnection {
                         logger::log_warning(&format!(
                             "Client {} ({:?}) timed out - no response for {:?}",
                             self.addr,
-                            self.chat_name,
+                            self.username,
                             last_activity.elapsed()
                         ));
                         break;
@@ -329,44 +330,47 @@ impl UserConnection {
         }
 
         // Cleanup on disconnect
-        if let Some(chat_name) = &self.chat_name {
+        if let Some(name) = &self.username {
             // If session was taken over by a reconnecting client, don't clean up
             // The new connection now owns the username and session
             if self.session_taken_over {
                 logger::log_info(&format!(
                     "Old connection for {} closed (session taken over)",
-                    chat_name
+                    name
                 ));
                 return Ok(());
             }
 
-            let mut clients = self.connected_clients.write().await;
-            clients.remove(chat_name);
-            drop(clients);
+            {
+                let mut clients = self.connected_clients.write().await;
+                clients.remove(name);
+            }
 
-            // Remove from user_ips mapping
-            let mut ips = self.user_ips.write().await;
-            ips.remove(chat_name);
-            drop(ips);
+            {
+                let mut ips = self.user_ips.write().await;
+                ips.remove(name);
+            }
 
             // Only remove status and session on explicit quit/kick/ban, not on connection drops
             // (which may be reconnection attempts)
             if self.clear_status_on_disconnect {
-                let mut statuses = self.user_statuses.write().await;
-                statuses.remove(chat_name);
-                drop(statuses);
+                {
+                    let mut statuses = self.user_statuses.write().await;
+                    statuses.remove(name);
+                }
 
-                let mut sessions = self.user_sessions.write().await;
-                sessions.remove(chat_name);
-                drop(sessions);
+                {
+                    let mut sessions = self.user_sessions.write().await;
+                    sessions.remove(name);
+                }
             }
 
             if let Ok(leave_message) =
-                ChatMessage::try_new(MessageTypes::Leave, Some(chat_name.clone().into_bytes()))
+                ChatMessage::try_new(MessageTypes::Leave, Some(name.clone().into_bytes()))
             {
                 let _ = self.tx.send((leave_message, self.addr));
             }
-            logger::log_system(&format!("{} has left the chat", chat_name));
+            logger::log_system(&format!("{} has left the chat", name));
         }
 
         Ok(())
@@ -388,7 +392,7 @@ impl UserConnection {
                 message,
                 &mut self.rate_limiter,
                 &mut self.socket,
-                &mut self.chat_name,
+                &mut self.username,
             )
             .await
     }

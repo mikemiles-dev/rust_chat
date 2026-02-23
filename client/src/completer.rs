@@ -31,7 +31,7 @@ impl ClientCompleter {
                 // Complete username after /dm or /send
                 let cmd = parts[0];
                 let prefix = parts[1];
-                let users = self.users.read().unwrap();
+                let users = self.users.read().expect("connected users lock poisoned");
                 return users
                     .iter()
                     .filter(|u| u.starts_with(prefix))

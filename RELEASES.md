@@ -1,3 +1,11 @@
+# 0.1.13
+ * Removed dead code: unused struct fields, error variants, and `#[allow(dead_code)]` annotations.
+ * Renamed `chat_name` to `username` throughout the server crate for consistency.
+ * Added shared binary parsing helpers (`extract_length_prefixed_string`, `validate_binary_length`) to reduce duplicated parsing logic.
+ * Replaced bare `.unwrap()` on lock acquisitions with descriptive `.expect()` messages.
+ * Replaced explicit `drop()` calls with scoped blocks for clearer lock lifetimes.
+ * Extracted file transfer logic into dedicated modules on both client and server.
+
 # 0.1.12
  * Ghost session reclaim: Reconnecting clients can now reclaim their own "ghost" session instead of being renamed. If you disconnect and reconnect quickly (before the 60s timeout), and your old session is still active, the server will recognize you and let you take over your username seamlessly.
 

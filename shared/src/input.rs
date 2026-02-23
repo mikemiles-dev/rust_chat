@@ -2,8 +2,6 @@
 pub enum UserInputError {
     IoError,
     InvalidCommand,
-    #[allow(dead_code)]
-    InvalidUser,
 }
 
 impl From<std::io::Error> for UserInputError {

@@ -1,5 +1,6 @@
 mod client;
 mod completer;
+mod file_transfer;
 mod input;
 mod readline_helper;
 

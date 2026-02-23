@@ -8,7 +8,6 @@ use tokio::sync::mpsc;
 /// Runs rustyline in a blocking thread and sends input via channel
 pub fn spawn_readline_handler(
     users: Arc<RwLock<HashSet<String>>>,
-    _prompt: String,
 ) -> mpsc::UnboundedReceiver<Option<String>> {
     let (tx, rx) = mpsc::unbounded_channel();
 
