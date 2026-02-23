@@ -15,11 +15,14 @@ use tokio::net::TcpListener;
 use tokio::sync::{RwLock, broadcast};
 use tokio_rustls::TlsAcceptor;
 
-mod completer;
+const TLS_HANDSHAKE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+const BROADCAST_BUFFER_MULTIPLIER: usize = 16;
+const SERVER_CMD_CHANNEL_SIZE: usize = 100;
+
 mod input;
-mod readline_helper;
 mod user_connection;
 use input::ServerUserInput;
+use shared::completer::CommandCompleter;
 use user_connection::{UserConnection, UserConnectionError};
 
 #[derive(Debug, Clone)]
@@ -55,8 +58,8 @@ impl ChatServer {
         max_clients: usize,
         tls_acceptor: Option<TlsAcceptor>,
     ) -> io::Result<Self> {
-        let (tx, _rx) = broadcast::channel(max_clients * 16); // Allow message buffering
-        let (cmd_tx, _cmd_rx) = broadcast::channel(100); // Server commands channel
+        let (tx, _rx) = broadcast::channel(max_clients * BROADCAST_BUFFER_MULTIPLIER);
+        let (cmd_tx, _cmd_rx) = broadcast::channel(SERVER_CMD_CHANNEL_SIZE);
         let listener = TcpListener::bind(bind_addr).await?;
 
         Ok(ChatServer {
@@ -76,7 +79,8 @@ impl ChatServer {
 
     async fn run(&mut self) -> io::Result<()> {
         // Spawn readline handler in a blocking thread (if TTY available)
-        let mut readline_rx = readline_helper::spawn_readline_handler();
+        let completer = CommandCompleter::new(commands::completion_names(), None);
+        let mut readline_rx = shared::readline::spawn_readline_handler(completer, false);
 
         if readline_rx.is_none() {
             logger::log_info("Running in non-interactive mode (no TTY)");
@@ -128,7 +132,7 @@ impl ChatServer {
                                 let result = if let Some(acceptor) = tls_acceptor {
                                     // Add timeout to TLS handshake to prevent hanging connections
                                     match tokio::time::timeout(
-                                        std::time::Duration::from_secs(30),
+                                        TLS_HANDSHAKE_TIMEOUT,
                                         acceptor.accept(socket)
                                     ).await {
                                         Ok(Ok(tls_stream)) => {

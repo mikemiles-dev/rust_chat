@@ -1,24 +1,30 @@
-use crate::completer::ServerCompleter;
+use crate::completer::CommandCompleter;
 use rustyline::Editor;
 use rustyline::config::Configurer;
 use tokio::sync::mpsc;
 
-/// Runs rustyline in a blocking thread and sends input via channel
-/// Returns None if TTY is not available (e.g., Docker without -it)
-pub fn spawn_readline_handler() -> Option<mpsc::UnboundedReceiver<Option<String>>> {
+/// Spawns a rustyline handler in a blocking thread and sends input via channel.
+///
+/// If `require_tty` is true and no TTY is available, panics.
+/// If `require_tty` is false and no TTY is available, returns `None`.
+pub fn spawn_readline_handler(
+    completer: CommandCompleter,
+    require_tty: bool,
+) -> Option<mpsc::UnboundedReceiver<Option<String>>> {
     let (tx, rx) = mpsc::unbounded_channel();
 
-    // Try to create editor - if it fails (no TTY), return None
-    let rl_result = Editor::new();
-
-    if rl_result.is_err() {
-        // No TTY available (Docker/systemd/etc), skip readline
-        return None;
-    }
+    let rl = match Editor::new() {
+        Ok(rl) => rl,
+        Err(_) if require_tty => {
+            panic!("Failed to create editor: no TTY available");
+        }
+        Err(_) => {
+            return None;
+        }
+    };
 
     std::thread::spawn(move || {
-        let completer = ServerCompleter::new();
-        let mut rl = rl_result.unwrap();
+        let mut rl = rl;
         rl.set_helper(Some(completer));
         rl.set_auto_add_history(true);
         rl.set_max_history_size(1000).ok();

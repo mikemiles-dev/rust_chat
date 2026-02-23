@@ -1,8 +1,6 @@
 mod client;
-mod completer;
 mod file_transfer;
 mod input;
-mod readline_helper;
 
 use client::ChatClient;
 use shared::logger;

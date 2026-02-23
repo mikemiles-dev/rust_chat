@@ -1,10 +1,10 @@
 use crate::input::{self, ClientUserInput};
-use crate::readline_helper;
 use rustls::ClientConfig;
 use rustls::pki_types::ServerName;
 use shared::commands::client as commands;
+use shared::completer::CommandCompleter;
 use shared::logger;
-use shared::message::{ChatMessage, ChatMessageError, MessageTypes};
+use shared::message::{ChatMessage, ChatMessageError, MessageTypes, push_length_prefixed};
 use shared::network::{MAX_FILE_SIZE, TcpMessageHandler};
 use shared::version::VERSION;
 use std::collections::{HashMap, HashSet};
@@ -21,6 +21,10 @@ use tokio::time::sleep;
 use tokio_rustls::TlsConnector;
 use tokio_rustls::client::TlsStream;
 use uuid::Uuid;
+
+const DEFAULT_PORT: u16 = 8080;
+const RECONNECT_DELAY: Duration = Duration::from_millis(100);
+const FILE_HEADER_OVERHEAD: usize = 1024;
 
 /// Pending file transfer request (for senders waiting for acceptance)
 #[derive(Debug, Clone)]
@@ -41,6 +45,16 @@ pub enum ChatClientError {
     InvalidAddress,
     IoError,
     ChatMessageError,
+}
+
+impl std::fmt::Display for ChatClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChatClientError::InvalidAddress => write!(f, "invalid server address"),
+            ChatClientError::IoError => write!(f, "I/O error"),
+            ChatClientError::ChatMessageError => write!(f, "invalid chat message"),
+        }
+    }
 }
 
 impl From<AddrParseError> for ChatClientError {
@@ -201,7 +215,7 @@ impl ChatClient {
             Ok((host.to_string(), port, use_tls))
         } else {
             // No port specified, use default
-            Ok((addr.to_string(), 8080, use_tls))
+            Ok((addr.to_string(), DEFAULT_PORT, use_tls))
         }
     }
 
@@ -232,7 +246,7 @@ impl ChatClient {
         let _ = self.connection.shutdown().await;
 
         // Give the server time to detect the closure and clean up
-        sleep(Duration::from_millis(100)).await;
+        sleep(RECONNECT_DELAY).await;
 
         let mut backoff = INITIAL_BACKOFF;
         let mut attempt = 1;
@@ -569,10 +583,16 @@ impl ChatClient {
             }
         };
 
-        let file_size = metadata.len() as usize;
+        let file_size = match usize::try_from(metadata.len()) {
+            Ok(s) => s,
+            Err(_) => {
+                logger::log_error("File size exceeds platform address space");
+                return Ok(());
+            }
+        };
 
         // Check file size (100MB limit, minus some overhead for metadata)
-        let max_content_size = MAX_FILE_SIZE - 1024; // Leave room for headers
+        let max_content_size = MAX_FILE_SIZE - FILE_HEADER_OVERHEAD;
         if file_size > max_content_size {
             logger::log_error(&format!(
                 "File too large: {} bytes (max {} bytes / ~100MB)",
@@ -614,10 +634,12 @@ impl ChatClient {
         // Build file transfer request message
         // Format: recipient_len(1)|recipient|filename_len(1)|filename|filesize(8 bytes)
         let mut content = Vec::new();
-        content.push(recipient.len() as u8);
-        content.extend_from_slice(recipient.as_bytes());
-        content.push(file_name.len() as u8);
-        content.extend_from_slice(file_name.as_bytes());
+        if push_length_prefixed(&mut content, recipient).is_err()
+            || push_length_prefixed(&mut content, file_name).is_err()
+        {
+            logger::log_error("Recipient or filename too long for protocol (max 255 bytes)");
+            return Ok(());
+        }
         content.extend_from_slice(&(file_size as u64).to_be_bytes());
 
         let message = ChatMessage::try_new(MessageTypes::FileTransferRequest, Some(content))?;
@@ -669,10 +691,12 @@ impl ChatClient {
         // Build file transfer message: recipient|filename|filedata
         // We use a binary format: recipient_len(1)|recipient|filename_len(1)|filename|filedata
         let mut content = Vec::new();
-        content.push(recipient.len() as u8);
-        content.extend_from_slice(recipient.as_bytes());
-        content.push(file_name.len() as u8);
-        content.extend_from_slice(file_name.as_bytes());
+        if push_length_prefixed(&mut content, recipient).is_err()
+            || push_length_prefixed(&mut content, file_name).is_err()
+        {
+            logger::log_error("Recipient or filename too long for protocol (max 255 bytes)");
+            return Ok(());
+        }
         content.extend_from_slice(&file_data);
 
         let message = ChatMessage::try_new(MessageTypes::FileTransfer, Some(content))?;
@@ -683,10 +707,13 @@ impl ChatClient {
     }
 
     pub async fn run(&mut self) -> io::Result<()> {
-        // Spawn readline handler in a blocking thread with username as prompt
-        let mut readline_rx = readline_helper::spawn_readline_handler(
-            self.connected_users.clone(),
+        // Spawn readline handler in a blocking thread
+        let completer = CommandCompleter::new(
+            commands::completion_names(),
+            Some(self.connected_users.clone()),
         );
+        let mut readline_rx = shared::readline::spawn_readline_handler(completer, true)
+            .expect("TTY required for client");
 
         loop {
             tokio::select! {

@@ -1,8 +1,32 @@
 use shared::logger;
-use shared::message::{ChatMessage, MessageTypes, extract_length_prefixed_string, validate_binary_length};
+use shared::message::{ChatMessage, MessageTypes, extract_length_prefixed_string, push_length_prefixed, validate_binary_length};
 use shared::network::TcpMessageHandler;
 
 use crate::client::{ChatClient, ChatClientError, PendingIncomingTransfer};
+
+/// Extract a length-prefixed string field, logging and returning on failure.
+/// Use `extract_field!(content, offset, "context message")` for functions returning `()`,
+/// or `extract_field!(content, offset, "context message", true)` for functions returning `bool`.
+macro_rules! extract_field {
+    ($content:expr, $offset:expr, $msg:expr) => {
+        match extract_length_prefixed_string($content, $offset) {
+            Ok(v) => v,
+            Err(_) => {
+                logger::log_error($msg);
+                return;
+            }
+        }
+    };
+    ($content:expr, $offset:expr, $msg:expr, $ret:expr) => {
+        match extract_length_prefixed_string($content, $offset) {
+            Ok(v) => v,
+            Err(_) => {
+                logger::log_error($msg);
+                return $ret;
+            }
+        }
+    };
+}
 
 impl ChatClient {
     pub(crate) fn handle_file_transfer(&self, message: &ChatMessage) {
@@ -15,33 +39,14 @@ impl ChatClient {
         };
 
         // Parse binary format: recipient_len(1)|recipient|sender_len(1)|sender|filename_len(1)|filename|filedata
-        let (recipient, offset) = match extract_length_prefixed_string(content, 0) {
-            Ok(v) => v,
-            Err(_) => {
-                logger::log_error("Invalid file transfer format");
-                return;
-            }
-        };
+        let (recipient, offset) = extract_field!(content, 0, "Invalid file transfer format");
 
         if recipient != self.chat_name {
             return;
         }
 
-        let (sender, offset) = match extract_length_prefixed_string(content, offset) {
-            Ok(v) => v,
-            Err(_) => {
-                logger::log_error("Invalid sender name in file transfer");
-                return;
-            }
-        };
-
-        let (filename, offset) = match extract_length_prefixed_string(content, offset) {
-            Ok(v) => v,
-            Err(_) => {
-                logger::log_error("Invalid filename in file transfer");
-                return;
-            }
-        };
+        let (sender, offset) = extract_field!(content, offset, "Invalid sender name in file transfer");
+        let (filename, offset) = extract_field!(content, offset, "Invalid filename in file transfer");
 
         let file_data = &content[offset..];
 
@@ -79,44 +84,35 @@ impl ChatClient {
         };
 
         // Parse binary format: recipient_len(1)|recipient|sender_len(1)|sender|filename_len(1)|filename|filesize(8 bytes)
-        let (recipient, offset) = match extract_length_prefixed_string(content, 0) {
-            Ok(v) => v,
-            Err(_) => {
-                logger::log_error("Invalid file transfer request format");
-                return;
-            }
-        };
+        let (recipient, offset) = extract_field!(content, 0, "Invalid file transfer request format");
 
         if recipient != self.chat_name {
             return;
         }
 
-        let (sender, offset) = match extract_length_prefixed_string(content, offset) {
-            Ok(v) => v,
-            Err(_) => {
-                logger::log_error("Invalid sender name in file transfer request");
-                return;
-            }
-        };
-
-        let (filename, offset) = match extract_length_prefixed_string(content, offset) {
-            Ok(v) => v,
-            Err(_) => {
-                logger::log_error("Invalid filename in file transfer request");
-                return;
-            }
-        };
+        let (sender, offset) = extract_field!(content, offset, "Invalid sender name in file transfer request");
+        let (filename, offset) = extract_field!(content, offset, "Invalid filename in file transfer request");
 
         if validate_binary_length(content, offset, 8).is_err() {
             logger::log_error("Invalid file transfer request format");
             return;
         }
 
-        let file_size = u64::from_be_bytes(
-            content[offset..offset + 8]
-                .try_into()
-                .unwrap_or([0u8; 8]),
-        ) as usize;
+        let file_size_bytes: [u8; 8] = match content[offset..offset + 8].try_into() {
+            Ok(b) => b,
+            Err(_) => {
+                logger::log_error("Invalid file size bytes in transfer request");
+                return;
+            }
+        };
+        let file_size_u64 = u64::from_be_bytes(file_size_bytes);
+        let file_size = match usize::try_from(file_size_u64) {
+            Ok(s) => s,
+            Err(_) => {
+                logger::log_error("File size exceeds platform address space");
+                return;
+            }
+        };
 
         self.pending_incoming.insert(
             sender.to_string(),
@@ -153,25 +149,13 @@ impl ChatClient {
         };
 
         // Parse format: recipient_len(1)|recipient|sender_len(1)|sender|accepted(1)
-        let (recipient, offset) = match extract_length_prefixed_string(content, 0) {
-            Ok(v) => v,
-            Err(_) => {
-                logger::log_error("Invalid file transfer response format");
-                return true;
-            }
-        };
+        let (recipient, offset) = extract_field!(content, 0, "Invalid file transfer response format", true);
 
         if recipient != self.chat_name {
             return true;
         }
 
-        let (responder, offset) = match extract_length_prefixed_string(content, offset) {
-            Ok(v) => v,
-            Err(_) => {
-                logger::log_error("Invalid sender name in file transfer response");
-                return true;
-            }
-        };
+        let (responder, offset) = extract_field!(content, offset, "Invalid sender name in file transfer response", true);
 
         if validate_binary_length(content, offset, 1).is_err() {
             logger::log_error("Invalid file transfer response format");
@@ -223,8 +207,10 @@ impl ChatClient {
             ));
 
             let mut content = Vec::new();
-            content.push(sender.len() as u8);
-            content.extend_from_slice(sender.as_bytes());
+            if push_length_prefixed(&mut content, sender).is_err() {
+                logger::log_error("Sender name too long for protocol (max 255 bytes)");
+                return Ok(());
+            }
             content.push(1u8);
 
             let message = ChatMessage::try_new(MessageTypes::FileTransferResponse, Some(content))?;
@@ -244,8 +230,10 @@ impl ChatClient {
             ));
 
             let mut content = Vec::new();
-            content.push(sender.len() as u8);
-            content.extend_from_slice(sender.as_bytes());
+            if push_length_prefixed(&mut content, sender).is_err() {
+                logger::log_error("Sender name too long for protocol (max 255 bytes)");
+                return Ok(());
+            }
             content.push(0u8);
 
             let message = ChatMessage::try_new(MessageTypes::FileTransferResponse, Some(content))?;

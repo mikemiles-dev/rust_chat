@@ -1,7 +1,9 @@
 mod error;
 mod file_transfer_handlers;
 mod handlers;
+mod message_handlers;
 mod rate_limiting;
+mod user_handlers;
 
 pub use error::UserConnectionError;
 use handlers::MessageHandlers;

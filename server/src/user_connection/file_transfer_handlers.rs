@@ -1,10 +1,24 @@
 use shared::logger;
-use shared::message::{ChatMessage, MessageTypes, extract_length_prefixed_string, validate_binary_length};
+use shared::message::{ChatMessage, MessageTypes, extract_length_prefixed_string, push_length_prefixed, validate_binary_length};
 use shared::network::TcpMessageHandler;
+use std::net::SocketAddr;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::error::UserConnectionError;
 use super::handlers::{MessageHandlers, StreamWrapper};
+
+/// Extract a length-prefixed string field from binary content, logging on failure.
+fn parse_field<'a>(
+    content: &'a [u8],
+    offset: usize,
+    addr: SocketAddr,
+    context: &str,
+) -> Result<(&'a str, usize), UserConnectionError> {
+    extract_length_prefixed_string(content, offset).map_err(|_| {
+        logger::log_warning(&format!("Invalid {} from {}", context, addr));
+        UserConnectionError::InvalidMessage
+    })
+}
 
 impl<'a> MessageHandlers<'a> {
     pub(super) async fn process_file_transfer<S: AsyncRead + AsyncWrite + Unpin>(
@@ -14,30 +28,11 @@ impl<'a> MessageHandlers<'a> {
         username: &Option<String>,
     ) -> Result<(), UserConnectionError> {
         let content = content.ok_or(UserConnectionError::InvalidMessage)?;
-
-        let sender = match username {
-            Some(name) => name.clone(),
-            None => {
-                logger::log_warning(&format!(
-                    "User at {} tried to send file before joining",
-                    self.addr
-                ));
-                return Err(UserConnectionError::InvalidMessage);
-            }
-        };
+        let sender = self.require_username(username, "send file")?;
 
         // Parse binary format: recipient_len(1)|recipient|filename_len(1)|filename|filedata
-        let (recipient, offset) = extract_length_prefixed_string(content, 0)
-            .map_err(|_| {
-                logger::log_warning(&format!("Invalid file transfer format from {}", self.addr));
-                UserConnectionError::InvalidMessage
-            })?;
-
-        let (filename, offset) = extract_length_prefixed_string(content, offset)
-            .map_err(|_| {
-                logger::log_warning(&format!("Invalid file transfer format from {}", self.addr));
-                UserConnectionError::InvalidMessage
-            })?;
+        let (recipient, offset) = parse_field(content, 0, self.addr, "file transfer format")?;
+        let (filename, offset) = parse_field(content, offset, self.addr, "file transfer format")?;
 
         let file_data = &content[offset..];
 
@@ -72,12 +67,12 @@ impl<'a> MessageHandlers<'a> {
 
         // Build outgoing message: recipient_len(1)|recipient|sender_len(1)|sender|filename_len(1)|filename|filedata
         let mut final_content = Vec::new();
-        final_content.push(recipient.len() as u8);
-        final_content.extend_from_slice(recipient.as_bytes());
-        final_content.push(sender.len() as u8);
-        final_content.extend_from_slice(sender.as_bytes());
-        final_content.push(filename.len() as u8);
-        final_content.extend_from_slice(filename.as_bytes());
+        push_length_prefixed(&mut final_content, recipient)
+            .map_err(|_| UserConnectionError::InvalidMessage)?;
+        push_length_prefixed(&mut final_content, &sender)
+            .map_err(|_| UserConnectionError::InvalidMessage)?;
+        push_length_prefixed(&mut final_content, filename)
+            .map_err(|_| UserConnectionError::InvalidMessage)?;
         final_content.extend_from_slice(file_data);
 
         let file_message = ChatMessage::try_new(MessageTypes::FileTransfer, Some(final_content))
@@ -97,36 +92,11 @@ impl<'a> MessageHandlers<'a> {
         username: &Option<String>,
     ) -> Result<(), UserConnectionError> {
         let content = content.ok_or(UserConnectionError::InvalidMessage)?;
-
-        let sender = match username {
-            Some(name) => name.clone(),
-            None => {
-                logger::log_warning(&format!(
-                    "User at {} tried to send file request before joining",
-                    self.addr
-                ));
-                return Err(UserConnectionError::InvalidMessage);
-            }
-        };
+        let sender = self.require_username(username, "send file request")?;
 
         // Parse binary format: recipient_len(1)|recipient|filename_len(1)|filename|filesize(8 bytes)
-        let (recipient, offset) = extract_length_prefixed_string(content, 0)
-            .map_err(|_| {
-                logger::log_warning(&format!(
-                    "Invalid file transfer request format from {}",
-                    self.addr
-                ));
-                UserConnectionError::InvalidMessage
-            })?;
-
-        let (filename, offset) = extract_length_prefixed_string(content, offset)
-            .map_err(|_| {
-                logger::log_warning(&format!(
-                    "Invalid file transfer request format from {}",
-                    self.addr
-                ));
-                UserConnectionError::InvalidMessage
-            })?;
+        let (recipient, offset) = parse_field(content, 0, self.addr, "file transfer request format")?;
+        let (filename, offset) = parse_field(content, offset, self.addr, "file transfer request format")?;
 
         validate_binary_length(content, offset, 8).map_err(|_| {
             logger::log_warning(&format!(
@@ -170,12 +140,12 @@ impl<'a> MessageHandlers<'a> {
 
         // Build outgoing message with sender info
         let mut outgoing_content = Vec::new();
-        outgoing_content.push(recipient.len() as u8);
-        outgoing_content.extend_from_slice(recipient.as_bytes());
-        outgoing_content.push(sender.len() as u8);
-        outgoing_content.extend_from_slice(sender.as_bytes());
-        outgoing_content.push(filename.len() as u8);
-        outgoing_content.extend_from_slice(filename.as_bytes());
+        push_length_prefixed(&mut outgoing_content, recipient)
+            .map_err(|_| UserConnectionError::InvalidMessage)?;
+        push_length_prefixed(&mut outgoing_content, &sender)
+            .map_err(|_| UserConnectionError::InvalidMessage)?;
+        push_length_prefixed(&mut outgoing_content, filename)
+            .map_err(|_| UserConnectionError::InvalidMessage)?;
         outgoing_content.extend_from_slice(&file_size.to_be_bytes());
 
         let request_message =
@@ -196,27 +166,10 @@ impl<'a> MessageHandlers<'a> {
         username: &Option<String>,
     ) -> Result<(), UserConnectionError> {
         let content = content.ok_or(UserConnectionError::InvalidMessage)?;
-
-        let responder = match username {
-            Some(name) => name.clone(),
-            None => {
-                logger::log_warning(&format!(
-                    "User at {} tried to send file response before joining",
-                    self.addr
-                ));
-                return Err(UserConnectionError::InvalidMessage);
-            }
-        };
+        let responder = self.require_username(username, "send file response")?;
 
         // Parse binary format: sender_len(1)|sender|accepted(1)
-        let (original_sender, offset) = extract_length_prefixed_string(content, 0)
-            .map_err(|_| {
-                logger::log_warning(&format!(
-                    "Invalid file transfer response format from {}",
-                    self.addr
-                ));
-                UserConnectionError::InvalidMessage
-            })?;
+        let (original_sender, offset) = parse_field(content, 0, self.addr, "file transfer response format")?;
 
         validate_binary_length(content, offset, 1).map_err(|_| {
             logger::log_warning(&format!(
@@ -258,10 +211,10 @@ impl<'a> MessageHandlers<'a> {
 
         // Build outgoing message
         let mut outgoing_content = Vec::new();
-        outgoing_content.push(original_sender.len() as u8);
-        outgoing_content.extend_from_slice(original_sender.as_bytes());
-        outgoing_content.push(responder.len() as u8);
-        outgoing_content.extend_from_slice(responder.as_bytes());
+        push_length_prefixed(&mut outgoing_content, original_sender)
+            .map_err(|_| UserConnectionError::InvalidMessage)?;
+        push_length_prefixed(&mut outgoing_content, &responder)
+            .map_err(|_| UserConnectionError::InvalidMessage)?;
         outgoing_content.push(if accepted { 1u8 } else { 0u8 });
 
         let response_message =
