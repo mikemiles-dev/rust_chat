@@ -98,6 +98,7 @@ impl TcpMessageHandler for UserConnection {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 impl UserConnection {
     pub fn new(
         socket: TcpStream,

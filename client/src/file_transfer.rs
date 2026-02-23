@@ -1,5 +1,8 @@
 use shared::logger;
-use shared::message::{ChatMessage, MessageTypes, extract_length_prefixed_string, push_length_prefixed, validate_binary_length};
+use shared::message::{
+    ChatMessage, MessageTypes, extract_length_prefixed_string, push_length_prefixed,
+    validate_binary_length,
+};
 use shared::network::TcpMessageHandler;
 
 use crate::client::{ChatClient, ChatClientError, PendingIncomingTransfer};
@@ -45,8 +48,10 @@ impl ChatClient {
             return;
         }
 
-        let (sender, offset) = extract_field!(content, offset, "Invalid sender name in file transfer");
-        let (filename, offset) = extract_field!(content, offset, "Invalid filename in file transfer");
+        let (sender, offset) =
+            extract_field!(content, offset, "Invalid sender name in file transfer");
+        let (filename, offset) =
+            extract_field!(content, offset, "Invalid filename in file transfer");
 
         let file_data = &content[offset..];
 
@@ -84,14 +89,20 @@ impl ChatClient {
         };
 
         // Parse binary format: recipient_len(1)|recipient|sender_len(1)|sender|filename_len(1)|filename|filesize(8 bytes)
-        let (recipient, offset) = extract_field!(content, 0, "Invalid file transfer request format");
+        let (recipient, offset) =
+            extract_field!(content, 0, "Invalid file transfer request format");
 
         if recipient != self.chat_name {
             return;
         }
 
-        let (sender, offset) = extract_field!(content, offset, "Invalid sender name in file transfer request");
-        let (filename, offset) = extract_field!(content, offset, "Invalid filename in file transfer request");
+        let (sender, offset) = extract_field!(
+            content,
+            offset,
+            "Invalid sender name in file transfer request"
+        );
+        let (filename, offset) =
+            extract_field!(content, offset, "Invalid filename in file transfer request");
 
         if validate_binary_length(content, offset, 8).is_err() {
             logger::log_error("Invalid file transfer request format");
@@ -149,13 +160,19 @@ impl ChatClient {
         };
 
         // Parse format: recipient_len(1)|recipient|sender_len(1)|sender|accepted(1)
-        let (recipient, offset) = extract_field!(content, 0, "Invalid file transfer response format", true);
+        let (recipient, offset) =
+            extract_field!(content, 0, "Invalid file transfer response format", true);
 
         if recipient != self.chat_name {
             return true;
         }
 
-        let (responder, offset) = extract_field!(content, offset, "Invalid sender name in file transfer response", true);
+        let (responder, offset) = extract_field!(
+            content,
+            offset,
+            "Invalid sender name in file transfer response",
+            true
+        );
 
         if validate_binary_length(content, offset, 1).is_err() {
             logger::log_error("Invalid file transfer response format");
@@ -182,24 +199,25 @@ impl ChatClient {
                     responder
                 ));
             }
+        } else if let Some(transfer) = self.pending_outgoing.remove(responder) {
+            logger::log_warning(&format!(
+                "{} rejected file transfer for '{}'",
+                responder, transfer.file_name
+            ));
         } else {
-            if let Some(transfer) = self.pending_outgoing.remove(responder) {
-                logger::log_warning(&format!(
-                    "{} rejected file transfer for '{}'",
-                    responder, transfer.file_name
-                ));
-            } else {
-                logger::log_warning(&format!(
-                    "Received rejection from {} but no pending transfer found",
-                    responder
-                ));
-            }
+            logger::log_warning(&format!(
+                "Received rejection from {} but no pending transfer found",
+                responder
+            ));
         }
 
         true
     }
 
-    pub(crate) async fn accept_file_transfer(&mut self, sender: &str) -> Result<(), ChatClientError> {
+    pub(crate) async fn accept_file_transfer(
+        &mut self,
+        sender: &str,
+    ) -> Result<(), ChatClientError> {
         if let Some(transfer) = self.pending_incoming.remove(sender) {
             logger::log_info(&format!(
                 "Accepting file '{}' from {}...",
@@ -222,7 +240,10 @@ impl ChatClient {
         }
     }
 
-    pub(crate) async fn reject_file_transfer(&mut self, sender: &str) -> Result<(), ChatClientError> {
+    pub(crate) async fn reject_file_transfer(
+        &mut self,
+        sender: &str,
+    ) -> Result<(), ChatClientError> {
         if let Some(transfer) = self.pending_incoming.remove(sender) {
             logger::log_info(&format!(
                 "Rejecting file '{}' from {}",

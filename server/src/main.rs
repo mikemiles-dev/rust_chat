@@ -28,7 +28,10 @@ use user_connection::{UserConnection, UserConnectionError};
 #[derive(Debug, Clone)]
 pub enum ServerCommand {
     Kick(String),
-    Rename { old_name: String, new_name: String },
+    Rename {
+        old_name: String,
+        new_name: String,
+    },
     Ban(IpAddr),
     /// Session taken over by a new connection - old connection should disconnect silently
     SessionTakeover(String),
@@ -309,10 +312,7 @@ impl ChatServer {
             match user_ips.get(&username) {
                 Some(ip) => *ip,
                 None => {
-                    logger::log_error(&format!(
-                        "User '{}' not found or not connected",
-                        username
-                    ));
+                    logger::log_error(&format!("User '{}' not found or not connected", username));
                     return;
                 }
             }

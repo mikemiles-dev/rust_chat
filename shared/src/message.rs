@@ -179,7 +179,11 @@ pub fn push_length_prefixed(buf: &mut Vec<u8>, s: &str) -> Result<(), &'static s
 }
 
 /// Validate that a byte slice has at least `required` bytes remaining from `offset`.
-pub fn validate_binary_length(data: &[u8], offset: usize, required: usize) -> Result<(), &'static str> {
+pub fn validate_binary_length(
+    data: &[u8],
+    offset: usize,
+    required: usize,
+) -> Result<(), &'static str> {
     if data.len().saturating_sub(offset) < required {
         return Err("insufficient data length");
     }
@@ -189,7 +193,10 @@ pub fn validate_binary_length(data: &[u8], offset: usize, required: usize) -> Re
 /// Extract a length-prefixed string from `data` at `offset`.
 /// Format: `[1-byte length][string bytes]`.
 /// Returns the extracted string slice and the new offset past the string.
-pub fn extract_length_prefixed_string(data: &[u8], offset: usize) -> Result<(&str, usize), &'static str> {
+pub fn extract_length_prefixed_string(
+    data: &[u8],
+    offset: usize,
+) -> Result<(&str, usize), &'static str> {
     validate_binary_length(data, offset, 1)?;
     let len = data[offset] as usize;
     let start = offset + 1;

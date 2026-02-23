@@ -21,19 +21,19 @@ impl CommandCompleter {
         let trimmed = line.trim_start();
 
         // If line starts with /dm or /send and has a space, complete usernames
-        if let Some(ref users) = self.users {
-            if trimmed.starts_with("/dm ") || trimmed.starts_with("/send ") {
-                let parts: Vec<&str> = trimmed.splitn(3, ' ').collect();
-                if parts.len() == 2 {
-                    let cmd = parts[0];
-                    let prefix = parts[1];
-                    let users = users.read().expect("connected users lock poisoned");
-                    return users
-                        .iter()
-                        .filter(|u| u.starts_with(prefix))
-                        .map(|u| format!("{} {}", cmd, u))
-                        .collect();
-                }
+        if let Some(ref users) = self.users
+            && (trimmed.starts_with("/dm ") || trimmed.starts_with("/send "))
+        {
+            let parts: Vec<&str> = trimmed.splitn(3, ' ').collect();
+            if parts.len() == 2 {
+                let cmd = parts[0];
+                let prefix = parts[1];
+                let users = users.read().expect("connected users lock poisoned");
+                return users
+                    .iter()
+                    .filter(|u| u.starts_with(prefix))
+                    .map(|u| format!("{} {}", cmd, u))
+                    .collect();
             }
         }
 

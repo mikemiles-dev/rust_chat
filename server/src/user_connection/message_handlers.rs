@@ -4,7 +4,7 @@ use shared::network::TcpMessageHandler;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::error::UserConnectionError;
-use super::handlers::{MessageHandlers, StreamWrapper, MAX_MESSAGE_LENGTH, MAX_STATUS_LENGTH};
+use super::handlers::{MAX_MESSAGE_LENGTH, MAX_STATUS_LENGTH, MessageHandlers, StreamWrapper};
 
 impl<'a> MessageHandlers<'a> {
     pub(super) async fn process_list_users<S: AsyncRead + AsyncWrite + Unpin>(
@@ -115,11 +115,9 @@ impl<'a> MessageHandlers<'a> {
 
             // Format: sender|recipient|message for client filtering
             let dm_content = format!("{}|{}|{}", sender, recipient, message);
-            let dm_message = ChatMessage::try_new(
-                MessageTypes::DirectMessage,
-                Some(dm_content.into_bytes()),
-            )
-            .map_err(|_| UserConnectionError::InvalidMessage)?;
+            let dm_message =
+                ChatMessage::try_new(MessageTypes::DirectMessage, Some(dm_content.into_bytes()))
+                    .map_err(|_| UserConnectionError::InvalidMessage)?;
 
             // Broadcast to all clients (clients will filter)
             self.tx

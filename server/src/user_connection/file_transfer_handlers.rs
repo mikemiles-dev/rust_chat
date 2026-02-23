@@ -1,5 +1,8 @@
 use shared::logger;
-use shared::message::{ChatMessage, MessageTypes, extract_length_prefixed_string, push_length_prefixed, validate_binary_length};
+use shared::message::{
+    ChatMessage, MessageTypes, extract_length_prefixed_string, push_length_prefixed,
+    validate_binary_length,
+};
 use shared::network::TcpMessageHandler;
 use std::net::SocketAddr;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -95,8 +98,10 @@ impl<'a> MessageHandlers<'a> {
         let sender = self.require_username(username, "send file request")?;
 
         // Parse binary format: recipient_len(1)|recipient|filename_len(1)|filename|filesize(8 bytes)
-        let (recipient, offset) = parse_field(content, 0, self.addr, "file transfer request format")?;
-        let (filename, offset) = parse_field(content, offset, self.addr, "file transfer request format")?;
+        let (recipient, offset) =
+            parse_field(content, 0, self.addr, "file transfer request format")?;
+        let (filename, offset) =
+            parse_field(content, offset, self.addr, "file transfer request format")?;
 
         validate_binary_length(content, offset, 8).map_err(|_| {
             logger::log_warning(&format!(
@@ -169,7 +174,8 @@ impl<'a> MessageHandlers<'a> {
         let responder = self.require_username(username, "send file response")?;
 
         // Parse binary format: sender_len(1)|sender|accepted(1)
-        let (original_sender, offset) = parse_field(content, 0, self.addr, "file transfer response format")?;
+        let (original_sender, offset) =
+            parse_field(content, 0, self.addr, "file transfer response format")?;
 
         validate_binary_length(content, offset, 1).map_err(|_| {
             logger::log_warning(&format!(

@@ -6,7 +6,7 @@ use shared::version::{self, VERSION};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::error::UserConnectionError;
-use super::handlers::{MessageHandlers, StreamWrapper, MAX_USERNAME_LENGTH};
+use super::handlers::{MAX_USERNAME_LENGTH, MessageHandlers, StreamWrapper};
 
 impl<'a> MessageHandlers<'a> {
     pub(super) async fn process_join<S: AsyncRead + AsyncWrite + Unpin>(
@@ -18,12 +18,13 @@ impl<'a> MessageHandlers<'a> {
         let content = join_content.ok_or(UserConnectionError::InvalidMessage)?;
 
         // Parse username and session token (format: username|session_token)
-        let (requested_username, session_token) = if let Some((user, token)) = content.split_once('|') {
-            (user.to_string(), Some(token.to_string()))
-        } else {
-            // Backwards compatibility: if no session token, just use the username
-            (content, None)
-        };
+        let (requested_username, session_token) =
+            if let Some((user, token)) = content.split_once('|') {
+                (user.to_string(), Some(token.to_string()))
+            } else {
+                // Backwards compatibility: if no session token, just use the username
+                (content, None)
+            };
 
         // Validate username length
         if requested_username.is_empty() || requested_username.len() > MAX_USERNAME_LENGTH {
@@ -59,8 +60,11 @@ impl<'a> MessageHandlers<'a> {
                         let sessions = self.user_sessions.read().await;
                         let ips = self.user_ips.read().await;
                         (
-                            sessions.get(&requested_username).is_some_and(|t| t == token),
-                            ips.get(&requested_username).is_some_and(|ip| *ip == self.addr.ip()),
+                            sessions
+                                .get(&requested_username)
+                                .is_some_and(|t| t == token),
+                            ips.get(&requested_username)
+                                .is_some_and(|ip| *ip == self.addr.ip()),
                         )
                     };
 
@@ -77,13 +81,18 @@ impl<'a> MessageHandlers<'a> {
                     ));
 
                     // Signal the old connection to disconnect silently
-                    let _ = self.server_commands.send(ServerCommand::SessionTakeover(requested_username.clone()));
+                    let _ = self
+                        .server_commands
+                        .send(ServerCommand::SessionTakeover(requested_username.clone()));
 
                     // The username is already in the set, so we just claim it for this connection
                     *username = Some(requested_username.clone());
                 } else {
                     // Not a valid reconnection - rename the user
-                    logger::log_warning(&format!("User '{}' already exists, renaming...", requested_username));
+                    logger::log_warning(&format!(
+                        "User '{}' already exists, renaming...",
+                        requested_username
+                    ));
                     let new_name = self.randomize_username(&requested_username);
                     if !clients.insert(new_name.clone()) {
                         logger::log_error(&format!(
@@ -92,7 +101,10 @@ impl<'a> MessageHandlers<'a> {
                         ));
                         return Err(UserConnectionError::JoinError);
                     }
-                    logger::log_success(&format!("User '{}' renamed to '{}'", requested_username, new_name));
+                    logger::log_success(&format!(
+                        "User '{}' renamed to '{}'",
+                        requested_username, new_name
+                    ));
                     let rename_message = ChatMessage::try_new(
                         MessageTypes::UserRename,
                         Some(new_name.clone().into_bytes()),

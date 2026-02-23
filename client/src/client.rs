@@ -370,7 +370,10 @@ impl ChatClient {
                 if let Some(content) = self.get_message_content(&message, "list users") {
                     // Update the connected users list for autocomplete
                     {
-                        let mut users = self.connected_users.write().expect("connected users lock poisoned");
+                        let mut users = self
+                            .connected_users
+                            .write()
+                            .expect("connected users lock poisoned");
                         users.clear();
                         for user in content.lines() {
                             users.insert(user.to_string());
